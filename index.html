@@ -6,15 +6,23 @@
     <title>Web Logisim - Digital Logic Simulator</title>
     <link rel="stylesheet" href="style.css">
 
-    <!-- *** ICON FIX *** -->
-    <!-- Use the full, reliable UMD file from a CDN -->
-</head>
+    </head>
 <body>
 
-    <!-- Main Application Wrapper -->
+    <div id="splash-screen">
+        <div id="splash-content">
+            <h1 id="splash-title">Web Logisim</h1>
+            <p id="splash-loading">
+                <i data-lucide="loader-circle"></i> Connecting to services...
+            </p>
+            <button id="splash-login-btn" class="hidden">
+                <i data-lucide="log-in"></i> Login with Google
+            </button>
+            <p id="splash-error" class="hidden"></p>
+        </div>
+    </div>
     <div class="app-container">
 
-        <!-- Toolbar (content unchanged) -->
         <div class="toolbar">
             <div class="toolbar-header">
                 <h2>Tools</h2>
@@ -80,12 +88,10 @@
                     Project <span class="collapse-icon">▼</span>
                 </h3>
                 <div class="tool-section-content">
-                    <!-- *** NEW BUTTON FOR AUTH *** -->
                     <button class="tool-button" id="auth-btn" data-tool="AUTH" title="Login for Cloud Save">
                         <i data-lucide="log-in"></i>
                         <span>Login</span>
                     </button>
-                    <!-- *** --- *** -->
                     <button class="tool-button" id="save-circuit-btn" data-tool="SAVE" title="Save As...">
                         <i data-lucide="save"></i>
                         <span>Save As...</span>
@@ -102,7 +108,6 @@
             </div>
         </div>
 
-        <!-- Main content (content unchanged) -->
         <div class="main-content">
             <div id="canvas-wrapper">
                 <canvas id="simulation-canvas"></canvas>
@@ -124,7 +129,6 @@
         </div>
     </div>
 
-    <!-- Modals (content unchanged) -->
     <div id="ai-modal-backdrop" class="hidden">
         <div id="ai-modal" class="modal-dialog">
             <div class="ai-header">
@@ -179,9 +183,8 @@
         </div>
     </div>
 
-    <!-- *** SCRIPT ORDER UPDATED *** -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-    <!-- *** NEW: FIREBASE SDK *** -->
+
     <script type="module">
         // These are the core Firebase libraries we'll need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -227,5 +230,3 @@
     <script src="main.js"></script>
 </body>
 </html>
-
-

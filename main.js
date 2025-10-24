@@ -34,8 +34,13 @@ const Main = {
         
         // --- Initialize all managers ---
         CanvasRenderer.init(this.canvas); 
-        AIManager.init(); 
+        
+        // --- MODIFIED: Initialize AuthManager *before* StorageManager ---
+        AuthManager.init(); 
         StorageManager.init();
+        // --- ---
+        
+        AIManager.init(); 
         AnimationManager.init();
         InputHandler.init(); // --- NEW: Initialize input handler ---
 
@@ -57,7 +62,7 @@ const Main = {
         // --- Load auto-save circuit ---
         const loaded = Simulator.loadAutoSaveCircuit();
         if (loaded) {
-            this.updateStatus("Loaded auto-saved circuit.");
+            this.updateStatus("Loaded local auto-saved circuit.");
         } else {
             this.updateStatus("Ready. Select a tool or ask the AI.");
         }
@@ -102,7 +107,7 @@ const Main = {
         }
         
         // Update properties panel position *if* it's open (handles panning)
-        if (this.selectedComponent && this.propertiesPopup.classList.contains('visible')) {
+        if (this.propertiesPopup.classList.contains('visible')) {
             this.updatePropertiesPanelPosition();
         }
 
@@ -130,8 +135,10 @@ const Main = {
                     AIManager.showModal();
                     return;
                 }
-                if (toolName === 'SAVE' || toolName === 'LOAD') {
-                     // Handled by StorageManager, which has its own listeners
+                
+                // --- MODIFIED: These tools are handled by their own managers ---
+                if (toolName === 'SAVE' || toolName === 'LOAD' || toolName === 'AUTH') {
+                     // Handled by StorageManager and AuthManager
                      return;
                 }
                 
@@ -216,24 +223,17 @@ const Main = {
 
         this.wireStartNode = null; 
         
-        // --- *** MODIFIED: Handle PROPERTIES tool activation *** ---
+        // --- MODIFIED: Logic for properties tool ---
         if (toolName === 'PROPERTIES') {
-            if (this.selectedComponent) {
-                this.updatePropertiesPanel(); // Show panel for already-selected item
-                this.updateStatus("Edit properties below.");
-            } else {
-                this.updatePropertiesPanel(); // This will hide it
-                this.updateStatus("Tool selected: PROPERTIES. Click a component to edit.");
-            }
-        } else {
-             // Hide properties panel if switching to any *other* tool
-             if (this.propertiesPopup.classList.contains('visible')) {
-                  this.updatePropertiesPanel(true); // Force hide
+             this.updateStatus('Tool: Properties. Click a component to edit.');
+             if (this.selectedComponent) {
+                 this.updatePropertiesPanel(); // Show if one is already selected
              }
+        } else {
+             this.propertiesPopup.classList.remove('visible');
              this.updateStatus(`Tool selected: ${toolName}`);
         }
-        // --- *** ---
-
+        
         this.updateHoverAndCursor(
             CanvasRenderer.getWorldX(InputHandler.lastMouseScreenX), 
             CanvasRenderer.getWorldY(InputHandler.lastMouseScreenY)
@@ -242,23 +242,19 @@ const Main = {
 
     setSelectedComponent: function(component) {
         if (this.selectedComponent === component && component !== null) {
-            // --- *** MODIFIED: Only show panel if tool is active *** ---
+            // --- MODIFIED: Only show if tool is active ---
             if (this.currentTool === 'PROPERTIES') {
                  this.updatePropertiesPanel();
             }
-            // --- *** ---
             return; 
         }
         
         this.selectedComponent = component;
         
-        // --- *** MODIFIED: Only show panel if tool is active *** ---
+        // --- MODIFIED: Only show if tool is active ---
         if (this.currentTool === 'PROPERTIES') {
-            this.updatePropertiesPanel(); // This will show or hide it
-        } else {
-            this.updatePropertiesPanel(true); // Force hide
+             this.updatePropertiesPanel(); 
         }
-        // --- *** ---
     },
 
     updateStatus: function(text) {
@@ -343,14 +339,13 @@ const Main = {
              } else {
                   cursorStyle = 'default';
              }
-        // --- *** NEW: Handle PROPERTIES cursor *** ---
+        // --- MODIFIED: Cursor for properties tool ---
         } else if (this.currentTool === 'PROPERTIES') {
              if (objectAtMouse instanceof BaseGate) {
                  cursorStyle = 'pointer';
              } else {
                  cursorStyle = 'default';
              }
-        // --- *** ---
         } else { // Component placement tools
              cursorStyle = 'crosshair';
         }
@@ -479,7 +474,7 @@ const Main = {
     // --- 8. Properties Panel Functions ---
 
     updatePropertiesPanelPosition: function() {
-        if (!this.selectedComponent) return; 
+        if (!this.selectedComponent || !this.propertiesPopup.classList.contains('visible')) return; 
         
         const padding = 20; 
         const wrapperRect = this.canvasWrapper.getBoundingClientRect();
@@ -511,12 +506,8 @@ const Main = {
         this.propertiesPopup.style.top = `${popupY}px`;
     },
 
-    /**
-     * --- MODIFIED: Can be forced to hide ---
-     * @param {boolean} [forceHide=false] - If true, hide panel regardless of selection.
-     */
-    updatePropertiesPanel: function(forceHide = false) {
-        if (forceHide || !this.selectedComponent) {
+    updatePropertiesPanel: function() {
+        if (!this.selectedComponent) {
             this.propertiesPopup.classList.remove('visible');
             return;
         }
@@ -554,8 +545,6 @@ const Main = {
                     setterFunction.call(this.selectedComponent, e.target.value);
                     Simulator.autoSaveCircuit();
                 });
-                // --- NEW: Auto-focus the label input ---
-                setTimeout(() => input.focus(), 0);
                 row.appendChild(input);
             } else if (prop.type === 'select') {
                 const select = document.createElement('select');
@@ -580,8 +569,8 @@ const Main = {
             this.propertiesPopup.appendChild(row);
         });
         
-        this.updatePropertiesPanelPosition();
         this.propertiesPopup.classList.add('visible');
+        this.updatePropertiesPanelPosition();
     }
 };
 

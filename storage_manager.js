@@ -8,6 +8,9 @@ const StorageManager = {
     saveNameInput: null,
     saveConfirmBtn: null,
     
+    // --- NEW: AI Name Loading ---
+    aiNameLoader: null,
+    
     loadModalBackdrop: null,
     loadModal: null,
     loadList: null,
@@ -39,6 +42,9 @@ const StorageManager = {
         this.saveConfirmBtn = document.getElementById('save-modal-confirm-btn');
         const saveModalCloseBtn = document.getElementById('save-modal-close-btn');
         const saveModalCancelBtn = document.getElementById('save-modal-cancel-btn');
+        
+        // --- NEW: Find AI loader ---
+        this.aiNameLoader = document.getElementById('ai-name-loading');
         
         // --- Find Load Modal Elements ---
         this.loadModalBackdrop = document.getElementById('load-modal-backdrop');
@@ -140,20 +146,42 @@ const StorageManager = {
 
     // --- 3. Modal Control ---
 
-    openSaveModal: function() {
+    /**
+     * --- MODIFIED: Now async and calls AI for a name ---
+     */
+    openSaveModal: async function() {
         if (!this.saveModalBackdrop || !this.currentUserId) return;
         
-        this.saveNameInput.value = ''; // Clear old name
-        this.saveNameInput.disabled = false;
-        this.saveConfirmBtn.disabled = false;
-        
-        // Remove AI loader (we removed this feature to simplify)
-        const aiLoader = document.getElementById('ai-name-loading');
-        if(aiLoader) aiLoader.classList.add('hidden');
-        
-        this.saveNameInput.placeholder = "My Circuit Name";
         this.saveModalBackdrop.classList.remove('hidden');
-        this.saveNameInput.focus();
+        
+        // --- NEW: Start loading state ---
+        this.saveNameInput.value = '';
+        this.saveNameInput.placeholder = "Generating smart name...";
+        this.saveNameInput.disabled = true;
+        this.saveConfirmBtn.disabled = true;
+        this.aiNameLoader?.classList.remove('hidden');
+
+        try {
+            const circuitData = Simulator.getCircuitData();
+            if (!circuitData || circuitData.components.length === 0) {
+                throw new Error("Cannot name an empty circuit");
+            }
+            
+            // Call the new AI function
+            const name = await AIManager.generateCircuitName(circuitData);
+            this.saveNameInput.value = name;
+
+        } catch (error) {
+            console.error("Failed to generate AI name:", error);
+            // If AI fails, provide a default
+            this.saveNameInput.placeholder = "My Circuit";
+        } finally {
+            // --- NEW: Stop loading state ---
+            this.aiNameLoader?.classList.add('hidden');
+            this.saveNameInput.disabled = false;
+            this.saveConfirmBtn.disabled = false;
+            this.saveNameInput.focus();
+        }
     },
     
     closeSaveModal: function() {

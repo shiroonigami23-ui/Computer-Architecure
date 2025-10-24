@@ -1,60 +1,60 @@
 // This file manages all logic for saving and loading circuits
-// It controls the save/load modals and interacts with localStorage
-// --- NEW: It now automatically suggests a name on "Save As..." ---
+// --- *** MODIFIED: Uses Firebase Firestore instead of localStorage *** ---
 
 const StorageManager = {
-    // --- Constants ---
-    STORAGE_KEY: 'web-logisim-saves',
-
-    // --- UI Elements ---
+    // --- 1. UI Elements ---
     saveModalBackdrop: null,
     saveModal: null,
     saveNameInput: null,
-    // --- REMOVED: aiNameButton ---
-    aiNameLoading: null,
     saveConfirmBtn: null,
     
     loadModalBackdrop: null,
     loadModal: null,
     loadList: null,
-    
-    // --- AI Naming ---
-    AI_NAME_SYSTEM_PROMPT: `You are an expert digital logic circuit analyst.
-You will be given a JSON object summarizing a logic circuit.
-Your ONLY task is to analyze this circuit and return a concise, accurate name for what it is.
-- Respond with ONLY the name (e..g, "Full Adder", "SR Latch", "2-to-1 Multiplexer").
-- Do NOT add any other text, explanations, or quotation marks.
-- If the circuit is simple, just name what you see (e.g., "AND-OR Logic").
-- If the circuit is empty, respond with "Empty Circuit".`,
+
+    saveCircuitBtn: null,
+    loadCircuitBtn: null,
+
+    // --- 2. Firebase State ---
+    currentUserId: null,
+    savedCircuits: [], // Local cache of cloud circuits
+    unsubscribeFromSaves: null, // Function to stop the Firestore listener
 
     /**
      * Finds all modal elements and hooks up all event listeners.
      */
     init: function() {
         console.log("Storage Manager initializing...");
+        
+        // De-structure the functions we'll need from the global object
+        // This is just a safety check
+        if (!window.firebase) {
+            console.error("Firebase SDK not loaded. Storage Manager cannot start.");
+            return;
+        }
 
         // --- Find Save Modal Elements ---
         this.saveModalBackdrop = document.getElementById('save-modal-backdrop');
         this.saveModal = document.getElementById('save-modal');
         this.saveNameInput = document.getElementById('save-circuit-name');
-        // --- REMOVED: aiNameButton (it's automatic) ---
-        this.aiNameLoading = document.getElementById('ai-name-loading');
         this.saveConfirmBtn = document.getElementById('save-modal-confirm-btn');
         const saveModalCloseBtn = document.getElementById('save-modal-close-btn');
         const saveModalCancelBtn = document.getElementById('save-modal-cancel-btn');
-        const saveCircuitBtn = document.getElementById('save-circuit-btn');
-
+        
         // --- Find Load Modal Elements ---
         this.loadModalBackdrop = document.getElementById('load-modal-backdrop');
         this.loadModal = document.getElementById('load-modal');
         this.loadList = document.getElementById('load-circuit-list');
         const loadModalCloseBtn = document.getElementById('load-modal-close-btn');
         const loadModalCancelBtn = document.getElementById('load-modal-cancel-btn');
-        const loadCircuitBtn = document.getElementById('load-circuit-btn');
+        
+        // --- Find Toolbar Buttons ---
+        this.saveCircuitBtn = document.getElementById('save-circuit-btn');
+        this.loadCircuitBtn = document.getElementById('load-circuit-btn');
 
         // --- Hook up Toolbar Listeners ---
-        saveCircuitBtn?.addEventListener('click', () => this.openSaveModal());
-        loadCircuitBtn?.addEventListener('click', () => this.openLoadModal());
+        this.saveCircuitBtn?.addEventListener('click', () => this.openSaveModal());
+        this.loadCircuitBtn?.addEventListener('click', () => this.openLoadModal());
 
         // --- Hook up Save Modal Listeners ---
         saveModalCloseBtn?.addEventListener('click', () => this.closeSaveModal());
@@ -63,7 +63,6 @@ Your ONLY task is to analyze this circuit and return a concise, accurate name fo
             if (e.target === this.saveModalBackdrop) this.closeSaveModal();
         });
         this.saveConfirmBtn?.addEventListener('click', () => this.handleSaveCircuit());
-        // --- REMOVED: aiNameButton listener ---
         
         // --- Hook up Load Modal Listeners ---
         loadModalCloseBtn?.addEventListener('click', () => this.closeLoadModal());
@@ -86,43 +85,76 @@ Your ONLY task is to analyze this circuit and return a concise, accurate name fo
                 this.handleLoadCircuit(circuitName);
             }
         });
+
+        // --- Disable buttons by default ---
+        // They will be enabled by onUserLogin()
+        this.setStorageButtonsDisabled(true);
     },
 
-    // --- Modal Control ---
+    /**
+     * Called by AuthManager when a user successfully logs in.
+     * @param {string} userId - The new user's ID.
+     */
+    onUserLogin: function(userId) {
+        console.log("Storage Manager: User logged in, enabling cloud save.");
+        this.currentUserId = userId;
+        this.setStorageButtonsDisabled(false);
+        this.subscribeToCircuitSaves();
+    },
 
     /**
-     * --- MODIFIED: Now automatically fetches AI name ---
+     * Called by AuthManager when the user logs out.
      */
-    openSaveModal: async function() {
-        if (!this.saveModalBackdrop) return;
+    onUserLogout: function() {
+        console.log("Storage Manager: User logged out, disabling cloud save.");
+        this.currentUserId = null;
+        this.setStorageButtonsDisabled(true);
         
-        // --- Show modal and loading state immediately ---
-        this.saveNameInput.value = ''; // Clear old name
-        this.saveNameInput.disabled = true;
-        this.saveConfirmBtn.disabled = true;
-        this.aiNameLoading.classList.remove('hidden');
-        this.saveModalBackdrop.classList.remove('hidden');
-
-        try {
-            // --- Fetch the name automatically ---
-            const suggestedName = await this.fetchAiName();
-            if (suggestedName === "Empty Circuit") {
-                 AnimationManager.logError("Cannot save an empty circuit.");
-                 this.closeSaveModal();
-                 return;
-            }
-            this.saveNameInput.value = suggestedName;
-            this.saveNameInput.focus();
-
-        } catch (error) {
-            // Error is already logged by fetchAiName
-            this.saveNameInput.value = 'My Circuit'; // Fallback name
-        } finally {
-            // --- Hide loading state ---
-            this.saveNameInput.disabled = false;
-            this.saveConfirmBtn.disabled = false;
-            this.aiNameLoading.classList.add('hidden');
+        // Stop listening to the old user's data
+        if (this.unsubscribeFromSaves) {
+            this.unsubscribeFromSaves();
+            this.unsubscribeFromSaves = null;
         }
+        
+        this.savedCircuits = [];
+        this.populateLoadModal(); // Clear the list
+    },
+
+    /**
+     * Toggles the disabled state of the Save/Load buttons.
+     * @param {boolean} isDisabled - True to disable, false to enable.
+     */
+    setStorageButtonsDisabled: function(isDisabled) {
+        if (this.saveCircuitBtn) {
+            this.saveCircuitBtn.disabled = isDisabled;
+            this.saveCircuitBtn.title = isDisabled 
+                ? "Login to save to the cloud" 
+                : "Save As...";
+        }
+        if (this.loadCircuitBtn) {
+            this.loadCircuitBtn.disabled = isDisabled;
+            this.loadCircuitBtn.title = isDisabled 
+                ? "Login to load from the cloud" 
+                : "Load Project";
+        }
+    },
+
+    // --- 3. Modal Control ---
+
+    openSaveModal: function() {
+        if (!this.saveModalBackdrop || !this.currentUserId) return;
+        
+        this.saveNameInput.value = ''; // Clear old name
+        this.saveNameInput.disabled = false;
+        this.saveConfirmBtn.disabled = false;
+        
+        // Remove AI loader (we removed this feature to simplify)
+        const aiLoader = document.getElementById('ai-name-loading');
+        if(aiLoader) aiLoader.classList.add('hidden');
+        
+        this.saveNameInput.placeholder = "My Circuit Name";
+        this.saveModalBackdrop.classList.remove('hidden');
+        this.saveNameInput.focus();
     },
     
     closeSaveModal: function() {
@@ -130,8 +162,8 @@ Your ONLY task is to analyze this circuit and return a concise, accurate name fo
     },
     
     openLoadModal: function() {
-        if (!this.loadModalBackdrop) return;
-        this.populateLoadModal();
+        if (!this.loadModalBackdrop || !this.currentUserId) return;
+        // The list is already populated by the onSnapshot listener
         this.loadModalBackdrop.classList.remove('hidden');
     },
 
@@ -139,73 +171,147 @@ Your ONLY task is to analyze this circuit and return a concise, accurate name fo
         this.loadModalBackdrop?.classList.add('hidden');
     },
 
-    // --- Core Storage Functions ---
+    // --- 4. Core Firestore Functions ---
 
-    getSavedCircuits: function() {
+    /**
+     * Subscribes to the user's private circuit collection in Firestore.
+     */
+    subscribeToCircuitSaves: function() {
+        if (!this.currentUserId) return;
+
+        // Unsubscribe from any previous listener
+        if (this.unsubscribeFromSaves) this.unsubscribeFromSaves();
+        
+        const { collection, query, onSnapshot } = window.firebase;
+        const db = AuthManager.db;
+        const appId = AuthManager.getAppId();
+        
         try {
-            const saves = localStorage.getItem(this.STORAGE_KEY);
-            return saves ? JSON.parse(saves) : {};
-        } catch (e) {
-            console.error("Error reading from localStorage:", e);
-            return {};
+            const collectionPath = `artifacts/${appId}/users/${this.currentUserId}/circuits`;
+            const q = query(collection(db, collectionPath));
+            
+            console.log(`Subscribing to circuit list at: ${collectionPath}`);
+
+            this.unsubscribeFromSaves = onSnapshot(q, (querySnapshot) => {
+                this.savedCircuits = [];
+                querySnapshot.forEach((doc) => {
+                    this.savedCircuits.push({
+                        id: doc.id, // The name is the ID
+                        ...doc.data()
+                    });
+                });
+                
+                // Sort by save date, newest first
+                this.savedCircuits.sort((a, b) => {
+                    const dateA = a.savedAt?.toDate ? a.savedAt.toDate() : 0;
+                    const dateB = b.savedAt?.toDate ? b.savedAt.toDate() : 0;
+                    return dateB - dateA;
+                });
+
+                console.log(`Cloud data updated. Found ${this.savedCircuits.length} circuits.`);
+                this.populateLoadModal(); // Refresh the load modal list
+                
+            }, (error) => {
+                console.error("Error listening to circuit saves:", error);
+                AnimationManager.logError(`Cloud Error: ${error.message}`);
+            });
+            
+        } catch (error) {
+            console.error("Error setting up circuit subscription:", error);
+            AnimationManager.logError(`Cloud Error: ${error.message}`);
         }
     },
-    
-    handleSaveCircuit: function() {
+
+    /**
+     * Saves the current circuit to Firestore using the name as the document ID.
+     */
+    handleSaveCircuit: async function() {
         const name = this.saveNameInput.value.trim();
         if (!name) {
-             // Use a custom modal alert later, for now, browser alert
-             alert("Please enter a circuit name."); 
+            Main.updateStatus("Please enter a circuit name.");
+            return;
+        }
+        
+        if (!this.currentUserId || !AuthManager.db) {
+            Main.updateStatus("Error: Not logged in. Cannot save.");
             return;
         }
 
+        // Get functions from global
+        const { doc, setDoc, serverTimestamp } = window.firebase;
+        const db = AuthManager.db;
+        const appId = AuthManager.getAppId();
+        
         try {
-            // --- Use the new function from simulator.js ---
+            // Get the circuit data from the simulator
             const circuitData = Simulator.getCircuitData(); 
             if (!circuitData) {
-                 alert("Could not get circuit data to save.");
+                 Main.updateStatus("Error: Could not get circuit data to save.");
                  return;
             }
-
-            const allSaves = this.getSavedCircuits();
-            allSaves[name] = {
-                name: name,
-                savedAt: new Date().toISOString(),
-                data: circuitData
-            };
             
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(allSaves));
+            // --- To be 100% safe, we stringify the complex data ---
+            // This ensures it saves to Firestore without issues.
+            const dataToSave = {
+                name: name,
+                savedAt: serverTimestamp(),
+                // Store the circuit data as a single JSON string
+                circuitData: JSON.stringify(circuitData) 
+            };
+
+            // Create a document reference using the *name* as the ID
+            const docRef = doc(db, "artifacts", appId, "users", this.currentUserId, "circuits", name);
+
+            this.saveConfirmBtn.disabled = true;
+            this.saveNameInput.disabled = true;
+            Main.updateStatus(`Saving "${name}" to the cloud...`);
+
+            // Use setDoc to create or overwrite the document
+            await setDoc(docRef, dataToSave);
+            
             AnimationManager.logStep(`Circuit saved as \`${name}\`.`);
             this.closeSaveModal();
 
         } catch (e) {
-            console.error("Error saving circuit:", e);
+            console.error("Error saving circuit to Firestore:", e);
             AnimationManager.logError(`Could not save circuit: ${e.message}`);
+        } finally {
+            this.saveConfirmBtn.disabled = false;
+            this.saveNameInput.disabled = false;
         }
     },
     
+    /**
+     * Loads a circuit from the local cache (which is populated by Firestore).
+     * @param {string} name - The name of the circuit to load.
+     */
     handleLoadCircuit: function(name) {
         if (!name) return;
         
+        // Find the circuit in our local cache
+        const circuitSave = this.savedCircuits.find(c => c.id === name);
+        
+        if (!circuitSave || !circuitSave.circuitData) {
+            AnimationManager.logError(`Could not find circuit data for \`${name}\`.`);
+            return;
+        }
+        
         // --- Use a simple confirm for now ---
+        // We can replace this with a custom modal later
         if (!confirm(`Are you sure you want to load "${name}"?\nYour current circuit will be replaced.`)) {
             return;
         }
         
         try {
-            const allSaves = this.getSavedCircuits();
-            const saveData = allSaves[name];
-
-            if (!saveData || !saveData.data) {
-                throw new Error("No data found for this circuit.");
-            }
+            // --- Parse the JSON string back into an object ---
+            const circuitData = JSON.parse(circuitSave.circuitData);
             
-            // --- Use the new function from simulator.js ---
-            Simulator.loadCircuitData(saveData.data); 
+            Simulator.loadCircuitData(circuitData); 
             
             this.closeLoadModal();
-            AnimationManager.logStep(`Circuit \`${name}\` loaded successfully.`);
+            AnimationManager.logStep(`Cloud circuit \`${name}\` loaded successfully.`);
             AnimationManager.startSimulation(); 
+            Simulator.autoSaveCircuit(); // Re-save to local auto-save
 
         } catch (e) {
             console.error("Error loading circuit:", e);
@@ -213,43 +319,58 @@ Your ONLY task is to analyze this circuit and return a concise, accurate name fo
         }
     },
     
-    handleDeleteCircuit: function(name) {
-        if (!name) return;
+    /**
+     * Deletes a circuit from Firestore.
+     * @param {string} name - The name of the circuit to delete.
+     */
+    handleDeleteCircuit: async function(name) {
+        if (!name || !this.currentUserId || !AuthManager.db) {
+            AnimationManager.logError("Error: Not logged in. Cannot delete.");
+            return;
+        }
         
         if (!confirm(`Are you sure you want to delete "${name}"?\nThis action cannot be undone.`)) {
             return;
         }
 
+        const { doc, deleteDoc } = window.firebase;
+        const db = AuthManager.db;
+        const appId = AuthManager.getAppId();
+
         try {
-            const allSaves = this.getSavedCircuits();
-            if (allSaves[name]) {
-                delete allSaves[name];
-                localStorage.setItem(this.STORAGE_KEY, JSON.stringify(allSaves));
-                AnimationManager.logStep(`Circuit \`${name}\` deleted.`);
-                this.populateLoadModal(); // Refresh the list
-            }
+            // Create a reference to the document
+            const docRef = doc(db, "artifacts", appId, "users", this.currentUserId, "circuits", name);
+            
+            Main.updateStatus(`Deleting "${name}" from the cloud...`);
+            
+            await deleteDoc(docRef);
+            
+            AnimationManager.logStep(`Circuit \`${name}\` deleted.`);
+            // The onSnapshot listener will automatically refresh the list
+
         } catch (e) {
             console.error("Error deleting circuit:", e);
             AnimationManager.logError(`Could not delete circuit: ${e.message}`);
         }
     },
 
+    /**
+     * Re-populates the "Load" modal list based on the local cache.
+     */
     populateLoadModal: function() {
-        this.loadList.innerHTML = ''; // Clear existing list
-        const allSaves = this.getSavedCircuits();
-        const circuits = Object.values(allSaves);
-
-        circuits.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+        if (!this.loadList) return;
         
-        if (circuits.length === 0) {
-            this.loadList.innerHTML = '<p style="padding: 20px; text-align: center;">No saved circuits found.</p>';
+        this.loadList.innerHTML = ''; // Clear existing list
+        
+        if (this.savedCircuits.length === 0) {
+            this.loadList.innerHTML = '<p style="padding: 20px; text-align: center;">No cloud circuits found. Try saving one!</p>';
             return;
         }
 
-        for (const circuit of circuits) {
+        for (const circuit of this.savedCircuits) {
             const item = document.createElement('div');
             item.className = 'load-item';
-            item.dataset.name = circuit.name;
+            item.dataset.name = circuit.id; // Use the ID (which is the name)
             
             const nameSpan = document.createElement('span');
             nameSpan.className = 'load-item-name';
@@ -257,7 +378,14 @@ Your ONLY task is to analyze this circuit and return a concise, accurate name fo
             
             const dateSpan = document.createElement('span');
             dateSpan.className = 'load-item-date';
-            dateSpan.textContent = new Date(circuit.savedAt).toLocaleString();
+            // Handle Firestore timestamp
+            let saveDate = "Just now";
+            if (circuit.savedAt && typeof circuit.savedAt.toDate === 'function') {
+                 saveDate = circuit.savedAt.toDate().toLocaleString();
+            } else if (circuit.savedAt) {
+                 saveDate = new Date(circuit.savedAt).toLocaleString(); // Fallback
+            }
+            dateSpan.textContent = saveDate;
             
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'load-item-delete';
@@ -275,80 +403,9 @@ Your ONLY task is to analyze this circuit and return a concise, accurate name fo
             this.loadList.appendChild(item);
         }
         
-        lucide.createIcons();
-    },
-
-    // --- AI Naming Function ---
-
-    /**
-     * --- MODIFIED: Now called automatically by openSaveModal ---
-     * @returns {string} - The suggested name, or a fallback.
-     */
-    fetchAiName: async function() {
-        try {
-            const circuitData = Simulator.getCircuitData();
-            if (!circuitData || (circuitData.components.length === 0 && circuitData.wires.length === 0)) {
-                return "Empty Circuit"; // Special case
-            }
-
-            // --- Create a simpler summary for the AI prompt ---
-            const circuitSummary = {
-                components: circuitData.components.map(c => c.type), // Just send a list of types
-                connections: circuitData.wires.length
-            };
-
-            // Limit summary size to avoid overly long prompts
-            if (circuitSummary.components.length > 50) {
-                 circuitSummary.components = circuitSummary.components.slice(0, 50);
-                 circuitSummary.components.push("...and more");
-            }
-
-            const userQuery = `Analyze this circuit and provide a name: ${JSON.stringify(circuitSummary)}`;
-
-            const apiKey = ""; // API key is injected
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-            const payload = {
-                contents: [{ parts: [{ text: userQuery }] }],
-                systemInstruction: { parts: [{ text: this.AI_NAME_SYSTEM_PROMPT }] },
-                generationConfig: {
-                    temperature: 0.1, 
-                    maxOutputTokens: 50
-                }
-            };
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                throw new Error(`AI API request failed with status ${response.status}`);
-            }
-
-            const result = await response.json();
-            
-            if (result.candidates && result.candidates[0].content?.parts?.[0]?.text) {
-                const suggestedName = result.candidates[0].content.parts[0].text
-                    .trim()
-                    .replace(/["']/g, ''); // Clean up any quotes
-                
-                AnimationManager.logStep(`AI suggested a name: \`${suggestedName}\``);
-                return suggestedName; // Return the name
-            } else {
-                throw new Error("AI did not return a valid name.");
-            }
-
-        } catch (error) {
-            console.error("AI Naming Error:", error);
-            AnimationManager.logError(`AI Naming failed: ${error.message}`);
-            return "My Circuit"; // Return a fallback name
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
         }
     }
 };
-
-// --- *** BUG FIX *** ---
-// The line below was causing a crash because it ran before the HTML was loaded.
-// Main.init() now correctly calls this function at the right time.
-// StorageManager.init(); // <-- REMOVED THIS LINE

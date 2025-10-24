@@ -33,16 +33,14 @@ const Main = {
         }
         
         // --- Initialize all managers ---
-        CanvasRenderer.init(this.canvas); 
-        
-        // --- MODIFIED: Initialize AuthManager *before* StorageManager ---
-        AuthManager.init(); 
+        // *** MODIFIED: AuthManager now init's first ***
+        AuthManager.init();
         StorageManager.init();
         // --- ---
-        
+        CanvasRenderer.init(this.canvas); 
         AIManager.init(); 
         AnimationManager.init();
-        InputHandler.init(); // --- NEW: Initialize input handler ---
+        InputHandler.init(); 
 
         // --- Setup (non-input) listeners ---
         this.setupToolbarListeners();
@@ -59,10 +57,10 @@ const Main = {
             }
         });
 
-        // --- Load auto-save circuit ---
+        // --- Load auto-save circuit (this is localStorage, will be replaced by cloud) ---
         const loaded = Simulator.loadAutoSaveCircuit();
         if (loaded) {
-            this.updateStatus("Loaded local auto-saved circuit.");
+            this.updateStatus("Loaded auto-saved circuit.");
         } else {
             this.updateStatus("Ready. Select a tool or ask the AI.");
         }
@@ -70,21 +68,8 @@ const Main = {
         this.mainLoop(); 
         AnimationManager.startSimulation();
         
-        // --- *** ICON FIX *** ---
-        // Run this last, after everything is initialized.
-        try {
-            console.log("Attempting to create icons...");
-            // Check if lucide is available
-            if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-                lucide.createIcons();
-                console.log("Icons created successfully.");
-            } else {
-                throw new Error("lucide.createIcons is not a function. Check script in index.html.");
-            }
-        } catch (iconError) {
-            console.warn("Lucide icons failed to load. The app will work, but icons will be missing.", iconError);
-            AnimationManager.logError("Warning: Could not load icons. (Are you offline?)");
-        }
+        // --- *** ICON FIX: REMOVED from here *** ---
+        // lucide.createIcons(); // <--- REMOVED
         // --- *** ---
     },
 
@@ -107,7 +92,7 @@ const Main = {
         }
         
         // Update properties panel position *if* it's open (handles panning)
-        if (this.propertiesPopup.classList.contains('visible')) {
+        if (this.selectedComponent && this.propertiesPopup.classList.contains('visible')) {
             this.updatePropertiesPanelPosition();
         }
 
@@ -116,13 +101,11 @@ const Main = {
     },
 
     // --- 3. Event Listener Setup (Refactored) ---
-    // These listeners are for UI buttons, NOT the canvas.
     
     setupToolbarListeners: function() {
         const toolbar = document.querySelector('.toolbar');
         if (!toolbar) return;
 
-        // Use 'this' to keep context inside the listener
         toolbar.addEventListener('click', (e) => {
             const toolButton = e.target.closest('.tool-button');
             const header = e.target.closest('.collapsible-header');
@@ -135,14 +118,12 @@ const Main = {
                     AIManager.showModal();
                     return;
                 }
-                
-                // --- MODIFIED: These tools are handled by their own managers ---
                 if (toolName === 'SAVE' || toolName === 'LOAD' || toolName === 'AUTH') {
-                     // Handled by StorageManager and AuthManager
+                     // Handled by StorageManager/AuthManager, which have their own listeners
                      return;
                 }
                 
-                this.setActiveTool(toolName); // Use 'this'
+                this.setActiveTool(toolName); 
 
             } else if (header) { 
                 const section = header.closest('.tool-section');
@@ -165,7 +146,6 @@ const Main = {
 
     setupRunButtonListeners: function() {
         const resetBtn = document.getElementById('reset-btn');
-        // Use 'this' to keep context inside the listener
         resetBtn?.addEventListener('click', () => {
             Simulator.resetSimulation(); 
             this.updateStatus('Simulation Reset. Select a tool.');
@@ -178,7 +158,6 @@ const Main = {
 
     setupExportButton: function() {
          const exportBtn = document.getElementById('export-png-btn');
-         // No 'this' needed here
          exportBtn?.addEventListener('click', () => {
               this.exportCanvasAsPNG();
          });
@@ -220,20 +199,25 @@ const Main = {
         this.currentTool = toolName;
         document.querySelectorAll('.tool-button').forEach(t => t.classList.remove('active'));
         toolButton.classList.add('active');
+        
+        // --- NEW: Logic for properties tool ---
+        if (toolName === 'PROPERTIES') {
+            if (this.selectedComponent) {
+                // If we select the tool and already have a component selected, show popup
+                this.updatePropertiesPanel();
+            } else {
+                // If we select the tool and have nothing selected, hide old popup
+                this.setSelectedComponent(null); 
+                this.updateStatus("Properties: Select a component to edit.");
+            }
+        } else {
+             // If we select any *other* tool, always hide the popup
+             this.setSelectedComponent(null); 
+        }
+        // --- ---
 
         this.wireStartNode = null; 
-        
-        // --- MODIFIED: Logic for properties tool ---
-        if (toolName === 'PROPERTIES') {
-             this.updateStatus('Tool: Properties. Click a component to edit.');
-             if (this.selectedComponent) {
-                 this.updatePropertiesPanel(); // Show if one is already selected
-             }
-        } else {
-             this.propertiesPopup.classList.remove('visible');
-             this.updateStatus(`Tool selected: ${toolName}`);
-        }
-        
+        this.updateStatus(`Tool selected: ${toolName}`);
         this.updateHoverAndCursor(
             CanvasRenderer.getWorldX(InputHandler.lastMouseScreenX), 
             CanvasRenderer.getWorldY(InputHandler.lastMouseScreenY)
@@ -241,20 +225,23 @@ const Main = {
     },
 
     setSelectedComponent: function(component) {
-        if (this.selectedComponent === component && component !== null) {
-            // --- MODIFIED: Only show if tool is active ---
-            if (this.currentTool === 'PROPERTIES') {
-                 this.updatePropertiesPanel();
-            }
-            return; 
+        // --- MODIFIED: Only show popup if Properties tool is active ---
+        if (this.selectedComponent === component) {
+             // If we're re-selecting the same component...
+             if (this.currentTool === 'PROPERTIES') {
+                 this.updatePropertiesPanel(); // Show it
+             }
+             return; 
         }
         
         this.selectedComponent = component;
         
-        // --- MODIFIED: Only show if tool is active ---
         if (this.currentTool === 'PROPERTIES') {
-             this.updatePropertiesPanel(); 
+            this.updatePropertiesPanel(); // Show for new component
+        } else {
+             this.propertiesPopup.classList.remove('visible'); // Hide for all other tools
         }
+        // --- ---
     },
 
     updateStatus: function(text) {
@@ -339,13 +326,14 @@ const Main = {
              } else {
                   cursorStyle = 'default';
              }
-        // --- MODIFIED: Cursor for properties tool ---
+        // --- NEW: Cursor for properties tool ---
         } else if (this.currentTool === 'PROPERTIES') {
-             if (objectAtMouse instanceof BaseGate) {
+            if (objectAtMouse instanceof BaseGate) {
                  cursorStyle = 'pointer';
-             } else {
+            } else {
                  cursorStyle = 'default';
-             }
+            }
+        // --- ---
         } else { // Component placement tools
              cursorStyle = 'crosshair';
         }
@@ -474,7 +462,7 @@ const Main = {
     // --- 8. Properties Panel Functions ---
 
     updatePropertiesPanelPosition: function() {
-        if (!this.selectedComponent || !this.propertiesPopup.classList.contains('visible')) return; 
+        if (!this.selectedComponent) return; 
         
         const padding = 20; 
         const wrapperRect = this.canvasWrapper.getBoundingClientRect();
@@ -535,8 +523,7 @@ const Main = {
                 console.error(`Component ${this.selectedComponent.label} is missing setter function ${setterName}`);
                 return; 
             }
-
-            if (prop.type === 'text') {
+if (prop.type === 'text') {
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.id = `prop-${prop.name}`;
@@ -569,14 +556,47 @@ const Main = {
             this.propertiesPopup.appendChild(row);
         });
         
-        this.propertiesPopup.classList.add('visible');
         this.updatePropertiesPanelPosition();
+        this.propertiesPopup.classList.add('visible');
     }
 };
 
 // --- Global Entry Point ---
-// We convert main.js to an object (Main) and call its init method.
-// All functions are now methods of Main (e.g., Main.setActiveTool)
 window.onload = () => {
+    // Run the main app initialization
     Main.init();
+
+    // --- *** ICON FIX: MOVED HERE *** ---
+    // This runs *after* Main.init() is complete and the DOM is loaded.
+    // We add a small delay to ensure the lucide.min.js script has
+    // had time to load and parse itself.
+    setTimeout(() => {
+        try {
+            console.log("Attempting to create icons...");
+            if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
+                console.log("Icons created successfully.");
+            } else {
+                throw new Error("lucide.createIcons is not available. Retrying...");
+            }
+        } catch (iconError) {
+            console.warn("Lucide icons failed to load. Retrying in 1s...", iconError);
+            // Second attempt, just in case
+            setTimeout(() => {
+                 try {
+                     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+                        lucide.createIcons();
+                        console.log("Icons created on second attempt.");
+                     } else {
+                         throw new Error("Lucide still not loaded.");
+                     }
+                 } catch (e) {
+                      console.error("Gave up trying to load icons.", e);
+                      AnimationManager.logError("Warning: Could not load icons.");
+                 }
+            }, 1000); // 1 second delay for retry
+        }
+    }, 100); // 100ms delay after window.onload
+    // --- *** END ICON FIX *** ---
 };
+    

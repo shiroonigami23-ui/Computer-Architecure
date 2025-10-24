@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Logisim - Digital Logic Simulator</title>
+    <title>Logisim - Digital Logic</title>
     <link rel="stylesheet" href="style.css">
-
-    </head>
+</head>
 <body>
-
     <div id="splash-screen">
         <div id="splash-content">
-            <h1 id="splash-title">Web Logisim</h1>
+            <h1 id="splash-title">Architecture</h1>
             <p id="splash-loading">
                 <i data-lucide="loader-circle"></i> Connecting to services...
             </p>
@@ -22,7 +20,6 @@
         </div>
     </div>
     <div class="app-container">
-
         <div class="toolbar">
             <div class="toolbar-header">
                 <h2>Tools</h2>
@@ -107,7 +104,6 @@
                 </div>
             </div>
         </div>
-
         <div class="main-content">
             <div id="canvas-wrapper">
                 <canvas id="simulation-canvas"></canvas>
@@ -128,7 +124,6 @@
             </div>
         </div>
     </div>
-
     <div id="ai-modal-backdrop" class="hidden">
         <div id="ai-modal" class="modal-dialog">
             <div class="ai-header">
@@ -182,43 +177,32 @@
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-
     <script type="module">
-        // These are the core Firebase libraries we'll need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // --- MODIFIED: Added Google Auth functions ---
         import { 
             getAuth, onAuthStateChanged, signInAnonymously,
             GoogleAuthProvider, signInWithPopup, signOut
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // --- ---
         import { 
             getFirestore, doc, getDoc, setDoc, deleteDoc, 
             collection, onSnapshot, query, 
             serverTimestamp 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Make these functions available to our other scripts
-        // This is a simple way to "export" them to the global window
         window.firebase = {
             initializeApp,
             getAuth,
             onAuthStateChanged,
             signInAnonymously,
-            // --- NEW ---
             GoogleAuthProvider,
             signInWithPopup,
             signOut,
-            // --- ---
             getFirestore,
             doc, getDoc, setDoc, deleteDoc,
             collection, onSnapshot, query,
             serverTimestamp
         };
     </script>
-
     <script src="components.js"></script>
     <script src="simulator.js"></script>
     <script src="canvas.js"></script>
@@ -228,27 +212,28 @@
     <script src="storage_manager.js"></script>
     <script src="input_handler.js"></script>
     <script src="main.js"></script>
-
     <script>
         function startApp() {
             console.log("Lucide is ready. Starting AuthManager...");
             AuthManager.init();
         }
-
         function checkLucide() {
             if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-                // Lucide is loaded!
+                try {
+                    lucide.createIcons();
+                    console.log("Splash screen icons created.");
+                } catch (e) {
+                    console.warn("Could not draw splash icons", e);
+                }
                 startApp();
             } else {
-                // Lucide not loaded yet, check again
                 console.log("Waiting for Lucide to load...");
                 setTimeout(checkLucide, 50); // Check every 50ms
             }
         }
-
-        // Start checking after the window is fully loaded
-        // This ensures all .js files (like auth_manager.js) are parsed first
-        window.onload = checkLucide;
+checkLucide();
     </script>
-    </body>
+</body>
 </html>
+
+

@@ -53,24 +53,23 @@ const Main = {
                  section.classList.add('collapsed');
             } else {
                  const content = section.querySelector('.tool-section-content');
-                 if(content) content.style.maxHeight = content.scrollHeight + "px";
+                 if(content) {
+                    // Set initial max-height for smooth load
+                    setTimeout(() => content.style.maxHeight = content.scrollHeight + "px", 0);
+                 }
             }
         });
 
         // --- Load auto-save circuit (this is localStorage, will be replaced by cloud) ---
         const loaded = Simulator.loadAutoSaveCircuit();
         if (loaded) {
-            this.updateStatus("Loaded auto-saved circuit.");
+            this.updateStatus("Loaded local auto-saved circuit.");
         } else {
-            this.updateStatus("Ready. Select a tool or ask the AI.");
+            this.updateStatus("Ready. Please login to use cloud save.");
         }
 
         this.mainLoop(); 
         AnimationManager.startSimulation();
-        
-        // --- *** ICON FIX: REMOVED from here *** ---
-        // lucide.createIcons(); // <--- REMOVED
-        // --- *** ---
     },
 
     /**
@@ -147,6 +146,10 @@ const Main = {
     setupRunButtonListeners: function() {
         const resetBtn = document.getElementById('reset-btn');
         resetBtn?.addEventListener('click', () => {
+            // --- Use confirm to prevent accidental reset ---
+            if (!confirm("Are you sure you want to clear the canvas?")) {
+                return;
+            }
             Simulator.resetSimulation(); 
             this.updateStatus('Simulation Reset. Select a tool.');
             this.setSelectedComponent(null); 
@@ -523,7 +526,8 @@ const Main = {
                 console.error(`Component ${this.selectedComponent.label} is missing setter function ${setterName}`);
                 return; 
             }
-if (prop.type === 'text') {
+
+            if (prop.type === 'text') {
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.id = `prop-${prop.name}`;
@@ -599,4 +603,3 @@ window.onload = () => {
     }, 100); // 100ms delay after window.onload
     // --- *** END ICON FIX *** ---
 };
-    

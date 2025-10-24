@@ -33,13 +33,11 @@ const Main = {
         }
         
         // --- Initialize all managers ---
-        // *** MODIFIED: AuthManager now init's first ***
-        AuthManager.init();
+        // *** MODIFIED: AuthManager is ALREADY initialized ***
         StorageManager.init();
-        // --- ---
         CanvasRenderer.init(this.canvas); 
         AIManager.init(); 
-        AnimationManager.init();
+        AnimationManager.init(); // This will clear and show the "Ready" log
         InputHandler.init(); 
 
         // --- Setup (non-input) listeners ---
@@ -65,11 +63,43 @@ const Main = {
         if (loaded) {
             this.updateStatus("Loaded local auto-saved circuit.");
         } else {
-            this.updateStatus("Ready. Please login to use cloud save.");
+            // --- MODIFIED: More generic ready message ---
+            this.updateStatus("Ready. Select a tool or ask the AI.");
         }
 
         this.mainLoop(); 
         AnimationManager.startSimulation();
+        
+        // --- *** ICON FIX: MOVED HERE *** ---
+        // This runs *after* Main.init() is complete and the app is visible
+        setTimeout(() => {
+            try {
+                console.log("Attempting to create icons...");
+                if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+                    lucide.createIcons();
+                    console.log("Icons created successfully.");
+                } else {
+                    throw new Error("lucide.createIcons is not available. Retrying...");
+                }
+            } catch (iconError) {
+                console.warn("Lucide icons failed to load. Retrying in 1s...", iconError);
+                // Second attempt, just in case
+                setTimeout(() => {
+                     try {
+                         if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+                            lucide.createIcons();
+                            console.log("Icons created on second attempt.");
+                         } else {
+                             throw new Error("Lucide still not loaded.");
+                         }
+                     } catch (e) {
+                          console.error("Gave up trying to load icons.", e);
+                          AnimationManager.logError("Warning: Could not load icons.");
+                     }
+                }, 1000); // 1 second delay for retry
+            }
+        }, 100); // 100ms delay after main.init
+        // --- *** END ICON FIX *** ---
     },
 
     /**
@@ -125,7 +155,7 @@ const Main = {
                 this.setActiveTool(toolName); 
 
             } else if (header) { 
-                const section = header.closest('.tool-section');
+                const section = header.closest('.collapsible-header');
                 if (!section) return;
 
                 section.classList.toggle('collapsed');
@@ -566,40 +596,6 @@ const Main = {
 };
 
 // --- Global Entry Point ---
-window.onload = () => {
-    // Run the main app initialization
-    Main.init();
-
-    // --- *** ICON FIX: MOVED HERE *** ---
-    // This runs *after* Main.init() is complete and the DOM is loaded.
-    // We add a small delay to ensure the lucide.min.js script has
-    // had time to load and parse itself.
-    setTimeout(() => {
-        try {
-            console.log("Attempting to create icons...");
-            if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-                lucide.createIcons();
-                console.log("Icons created successfully.");
-            } else {
-                throw new Error("lucide.createIcons is not available. Retrying...");
-            }
-        } catch (iconError) {
-            console.warn("Lucide icons failed to load. Retrying in 1s...", iconError);
-            // Second attempt, just in case
-            setTimeout(() => {
-                 try {
-                     if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-                        lucide.createIcons();
-                        console.log("Icons created on second attempt.");
-                     } else {
-                         throw new Error("Lucide still not loaded.");
-                     }
-                 } catch (e) {
-                      console.error("Gave up trying to load icons.", e);
-                      AnimationManager.logError("Warning: Could not load icons.");
-                 }
-            }, 1000); // 1 second delay for retry
-        }
-    }, 100); // 100ms delay after window.onload
-    // --- *** END ICON FIX *** ---
-};
+// --- MODIFIED: This is no longer the main entry point ---
+// AuthManager.init() is now the entry point, called by window.onload
+// in auth_manager.js

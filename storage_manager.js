@@ -186,7 +186,6 @@ const StorageManager = {
         
         const { collection, query, onSnapshot } = window.firebase;
         const db = AuthManager.db;
-        // --- FIX: Get appId from AuthManager ---
         const appId = AuthManager.getProjectId(); 
         
         try {
@@ -243,7 +242,6 @@ const StorageManager = {
         // Get functions from global
         const { doc, setDoc, serverTimestamp } = window.firebase;
         const db = AuthManager.db;
-        // --- FIX: Get appId from AuthManager ---
         const appId = AuthManager.getProjectId();
         
         try {
@@ -335,11 +333,10 @@ const StorageManager = {
         
         if (!confirm(`Are you sure you want to delete "${name}"?\nThis action cannot be undone.`)) {
             return;
-FS        }
+        }
 
         const { doc, deleteDoc } = window.firebase;
         const db = AuthManager.db;
-        // --- FIX: Get appId from AuthManager ---
         const appId = AuthManager.getProjectId();
 
         try {

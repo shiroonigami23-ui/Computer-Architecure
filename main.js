@@ -215,7 +215,25 @@ const Main = {
         toolButton.classList.add('active');
 
         this.wireStartNode = null; 
-        this.updateStatus(`Tool selected: ${toolName}`);
+        
+        // --- *** MODIFIED: Handle PROPERTIES tool activation *** ---
+        if (toolName === 'PROPERTIES') {
+            if (this.selectedComponent) {
+                this.updatePropertiesPanel(); // Show panel for already-selected item
+                this.updateStatus("Edit properties below.");
+            } else {
+                this.updatePropertiesPanel(); // This will hide it
+                this.updateStatus("Tool selected: PROPERTIES. Click a component to edit.");
+            }
+        } else {
+             // Hide properties panel if switching to any *other* tool
+             if (this.propertiesPopup.classList.contains('visible')) {
+                  this.updatePropertiesPanel(true); // Force hide
+             }
+             this.updateStatus(`Tool selected: ${toolName}`);
+        }
+        // --- *** ---
+
         this.updateHoverAndCursor(
             CanvasRenderer.getWorldX(InputHandler.lastMouseScreenX), 
             CanvasRenderer.getWorldY(InputHandler.lastMouseScreenY)
@@ -224,11 +242,23 @@ const Main = {
 
     setSelectedComponent: function(component) {
         if (this.selectedComponent === component && component !== null) {
-            this.updatePropertiesPanel();
+            // --- *** MODIFIED: Only show panel if tool is active *** ---
+            if (this.currentTool === 'PROPERTIES') {
+                 this.updatePropertiesPanel();
+            }
+            // --- *** ---
             return; 
         }
+        
         this.selectedComponent = component;
-        this.updatePropertiesPanel(); 
+        
+        // --- *** MODIFIED: Only show panel if tool is active *** ---
+        if (this.currentTool === 'PROPERTIES') {
+            this.updatePropertiesPanel(); // This will show or hide it
+        } else {
+            this.updatePropertiesPanel(true); // Force hide
+        }
+        // --- *** ---
     },
 
     updateStatus: function(text) {
@@ -313,6 +343,14 @@ const Main = {
              } else {
                   cursorStyle = 'default';
              }
+        // --- *** NEW: Handle PROPERTIES cursor *** ---
+        } else if (this.currentTool === 'PROPERTIES') {
+             if (objectAtMouse instanceof BaseGate) {
+                 cursorStyle = 'pointer';
+             } else {
+                 cursorStyle = 'default';
+             }
+        // --- *** ---
         } else { // Component placement tools
              cursorStyle = 'crosshair';
         }
@@ -473,8 +511,12 @@ const Main = {
         this.propertiesPopup.style.top = `${popupY}px`;
     },
 
-    updatePropertiesPanel: function() {
-        if (!this.selectedComponent) {
+    /**
+     * --- MODIFIED: Can be forced to hide ---
+     * @param {boolean} [forceHide=false] - If true, hide panel regardless of selection.
+     */
+    updatePropertiesPanel: function(forceHide = false) {
+        if (forceHide || !this.selectedComponent) {
             this.propertiesPopup.classList.remove('visible');
             return;
         }
@@ -512,6 +554,8 @@ const Main = {
                     setterFunction.call(this.selectedComponent, e.target.value);
                     Simulator.autoSaveCircuit();
                 });
+                // --- NEW: Auto-focus the label input ---
+                setTimeout(() => input.focus(), 0);
                 row.appendChild(input);
             } else if (prop.type === 'select') {
                 const select = document.createElement('select');

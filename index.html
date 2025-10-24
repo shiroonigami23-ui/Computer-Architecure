@@ -6,17 +6,11 @@
     <title>Web Logisim - Digital Logic Simulator</title>
     <link rel="stylesheet" href="style.css">
 
-    <!-- *** ICON FIX *** -->
-    <!-- Use the full, reliable UMD file from a CDN -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-    <!-- *** --- *** -->
 </head>
 <body>
 
-    <!-- Main Application Wrapper -->
     <div class="app-container">
-
-        <!-- Toolbar (content unchanged) -->
         <div class="toolbar">
             <div class="toolbar-header">
                 <h2>Tools</h2>
@@ -37,6 +31,10 @@
                     <button class="tool-button tool-delete" data-tool="DELETE" title="Delete (D)">
                         <i data-lucide="trash-2"></i>
                         <span>Delete</span>
+                    </button>
+                    <button class="tool-button" data-tool="PROPERTIES" title="Edit Properties (P)">
+                        <i data-lucide="sliders-horizontal"></i>
+                        <span>Properties</span>
                     </button>
                     <button class="tool-button tool-ai" data-tool="AI" title="AI Assistant (A)">
                         <i data-lucide="sparkles"></i>
@@ -80,7 +78,7 @@
                 <div class="tool-section-content">
                     <button class="tool-button" id="save-circuit-btn" data-tool="SAVE" title="Save As...">
                         <i data-lucide="save"></i>
-                        <span>Save As...</span>
+                        <span>Save As</span>
                     </button>
                     <button class="tool-button" id="load-circuit-btn" data-tool="LOAD" title="Load Project">
                         <i data-lucide="folder-open"></i>
@@ -94,7 +92,6 @@
             </div>
         </div>
 
-        <!-- Main content (content unchanged) -->
         <div class="main-content">
             <div id="canvas-wrapper">
                 <canvas id="simulation-canvas"></canvas>
@@ -116,7 +113,6 @@
         </div>
     </div>
 
-    <!-- Modals (content unchanged) -->
     <div id="ai-modal-backdrop" class="hidden">
         <div id="ai-modal" class="modal-dialog">
             <div class="ai-header">
@@ -171,18 +167,14 @@
         </div>
     </div>
 
-    <!-- *** SCRIPT ORDER UPDATED *** -->
     <script src="components.js"></script>
     <script src="simulator.js"></script>
     <script src="canvas.js"></script>
     <script src="animation.js"></script>
     <script src="ai.js"></script>
     <script src="storage_manager.js"></script>
-    <!-- *** NEW FILE *** -->
     <script src="input_handler.js"></script>
-    <!-- main.js must be LAST -->
     <script src="main.js"></script>
 </body>
 </html>
-
 

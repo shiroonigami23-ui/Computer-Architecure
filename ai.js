@@ -25,6 +25,7 @@ You are an expert logic circuit designer inside a web simulator. Your ONLY goal 
         -   **type**: REQUIRED. Valid types: "INPUT", "OUTPUT", "AND", "OR", "NOT", "XOR", "NAND", "NOR", "XNOR". **YOU MUST PROVIDE THIS.**
         -   **x**: REQUIRED. Number (e.g., 100).
         -   **y**: REQUIRED. Number (e.g., 150).
+        -   **label**: OPTIONAL. String. A custom name for the component (e.g., "Input A").
 
 2.  **addWire**: Connects two components. **ALL PARAMS ARE REQUIRED.**
     -   **command**: MUST be "addWire"
@@ -37,10 +38,10 @@ You are an expert logic circuit designer inside a web simulator. Your ONLY goal 
 **Example Request:** "Build an AND gate."
 **Your ONLY Response (JSON array, ALL fields included):**
 [
-  { "command": "addComponent", "params": { "id": "A", "type": "INPUT", "x": 100, "y": 150 } },
-  { "command": "addComponent", "params": { "id": "B", "type": "INPUT", "x": 100, "y": 250 } },
+  { "command": "addComponent", "params": { "id": "A", "type": "INPUT", "x": 100, "y": 150, "label": "Input A" } },
+  { "command": "addComponent", "params": { "id": "B", "type": "INPUT", "x": 100, "y": 250, "label": "Input B" } },
   { "command": "addComponent", "params": { "id": "and1", "type": "AND", "x": 300, "y": 200 } },
-  { "command": "addComponent", "params": { "id": "out", "type": "OUTPUT", "x": 500, "y": 200 } },
+  { "command": "addComponent", "params": { "id": "out", "type": "OUTPUT", "x": 500, "y": 200, "label": "Output" } },
   { "command": "addWire", "params": { "from_id": "A", "from_node": "out", "to_id": "and1", "to_node": "A" } },
   { "command": "addWire", "params": { "from_id": "B", "from_node": "out", "to_id": "and1", "to_node": "B" } },
   { "command": "addWire", "params": { "from_id": "and1", "from_node": "out", "to_id": "out", "to_node": "in" } }
@@ -119,7 +120,7 @@ REMEMBER: ONLY provide the valid JSON array. Double-check that ALL required para
         this.promptInput.disabled = isLoading; // Disable input while loading
     },
 
-    setError: function(message) {
+setError: function(message) {
         this.errorText.textContent = message;
         this.errorText.classList.remove('hidden');
     },
@@ -146,7 +147,7 @@ REMEMBER: ONLY provide the valid JSON array. Double-check that ALL required para
         this.chatMessages.push({ role: "user", parts: [{ text: userPrompt }] });
 
         try {
-            const apiKey = "AIzaSyD5tQg_ls50hZGVX24zGqGN0nDbHM1xsNE"; // <-- PASTE YOUR GEMINI API KEY HERE
+            const apiKey = "AIzaSyD5tQg_ls50hZGVX24zGqGN0nDbHM1xsNE"; // API key is injected
             // Use flash model for speed and cost
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
@@ -257,6 +258,7 @@ REMEMBER: ONLY provide the valid JSON array. Double-check that ALL required para
                              if (typeof action.params.type !== 'string' || !action.params.type) throw new Error(`addComponent '${action.params.id}' is missing 'type'.`);
                              if (typeof action.params.x !== 'number') throw new Error(`addComponent '${action.params.id}' is missing 'x'.`);
                              if (typeof action.params.y !== 'number') throw new Error(`addComponent '${action.params.id}' is missing 'y'.`);
+                             // Note: We don't validate 'label' because it's optional
                          } else if (action.command === 'addWire') {
                               if (typeof action.params.from_id !== 'string' || !action.params.from_id) throw new Error("addWire is missing 'from_id'.");
                               if (action.params.from_node !== 'out') throw new Error("addWire 'from_node' must be 'out'.");
@@ -350,7 +352,7 @@ REMEMBER: ONLY provide the valid JSON array. Double-check that ALL required para
         
         AnimationManager.logStep("AI build finished! Looks good. Let's run a quick simulation...");
         AnimationManager.startSimulation(); // Run simulation automatically after building
-        Simulator.saveCircuit();
+        Simulator.autoSaveCircuit(); // --- MODIFIED: Use autoSave ---
     },
 
     /**
@@ -388,7 +390,14 @@ REMEMBER: ONLY provide the valid JSON array. Double-check that ALL required para
             default:
                  throw new Error(`I don't know how to build a component called "${componentType}".`);
         }
-        
+
+        // --- NEW: Check for and set the custom label ---
+        if (params.label && typeof params.label === 'string' && newComponent.setCustomLabel) {
+            newComponent.setCustomLabel(params.label);
+            AnimationManager.log(`   ...and labeling it: "${params.label}"`);
+        }
+        // ---
+
         Simulator.addComponent(newComponent);
         this.tempComponentMap.set(componentId, newComponent); // Store mapping: AI ID -> Actual Component
         AnimationManager.log(`   Placing a ${componentType} named "${componentId}"`);

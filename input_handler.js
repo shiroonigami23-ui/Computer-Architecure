@@ -60,6 +60,9 @@ const InputHandler = {
                 case 'BACKSPACE':
                     Main.setActiveTool('DELETE');
                     break;
+                // --- *** NEW SHORTCUT *** ---
+                case 'P': Main.setActiveTool('PROPERTIES'); break;
+                // --- *** ---
                 case 'A': AIManager.showModal(); break;
                 case 'R': document.getElementById('reset-btn')?.click(); break;
                 case 'I': Main.setActiveTool('INPUT'); break;
@@ -180,6 +183,7 @@ const InputHandler = {
             
             // --- This logic calls back to Main ---
             
+            // --- MODIFIED: Handle selection based on tool ---
             if (Main.currentTool === 'SELECT') {
                  if (clickedObject && (clickedObject instanceof BaseGate)) {
                     Main.setSelectedComponent(clickedObject); 
@@ -189,6 +193,8 @@ const InputHandler = {
             } else if (Main.currentTool === 'WIRE' || Main.currentTool === 'DELETE') {
                  Main.setSelectedComponent(null); 
             }
+            // (Properties tool handles its own selection below)
+            // --- ---
 
             switch (Main.currentTool) {
                 case 'SELECT':
@@ -284,6 +290,16 @@ const InputHandler = {
                     }
                     break;
                 
+                // --- *** NEW: Handle PROPERTIES click *** ---
+                case 'PROPERTIES':
+                    if (clickedObject && clickedObject instanceof BaseGate) {
+                        Main.setSelectedComponent(clickedObject); // This will show the panel
+                    } else {
+                        Main.setSelectedComponent(null); // This will hide it
+                    }
+                    break;
+                // --- *** ---
+
                 // --- Component Placement ---
                 // This block creates the component, but Main handles setting the tool
                 default:
@@ -326,4 +342,3 @@ const InputHandler = {
         Main.updateHoverAndCursor(worldX, worldY);
     }
 };
-

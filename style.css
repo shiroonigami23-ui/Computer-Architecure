@@ -20,16 +20,19 @@
     --wire-hover: #d36307;
     --io-color: #17a2b8; /* Teal */
     --io-hover: #117a8b;
+    /* --- NEW --- */
+    --props-color: #17a2b8; /* Using the same Teal for properties */
+    --props-hover: #117a8b;
+    /* --- --- */
     --gate-color: #28a745; /* Green */
     --gate-hover: #1e7e34;
     --export-color: #6c757d; /* Grey */
     --export-hover: #5a6268;
-    /* --- NEW --- */
     --save-color: #007bff; /* Same as select */
     --save-hover: #0056b3;
     --load-color: #20c997; /* New Mint color */
     --load-hover: #17a77e;
-    /* --- --- */
+    
 
     --bg-light: #ffffff;
     --bg-medium: #f8f9fa;
@@ -118,21 +121,16 @@ h3 { /* Generic Section Header - used in Toolbar and Log */
     flex-grow: 1; /* Takes up space between log and status */
     position: relative; /* Needed for absolute positioning of canvas */
     background-color: var(--bg-light); /* Fallback/border color */
-    /* --- VIRTUAL CANVAS FIX --- */
     overflow: hidden; /* We handle panning in JS, not with scrollbars */
-    /* --- --- */
     -webkit-overflow-scrolling: touch; 
 }
 
 #simulation-canvas {
     display: block;
     background-color: #fff;
-    /* --- VIRTUAL CANVAS FIX --- */
-    /* --- *** THE FIX IS HERE *** --- */
-    /* Tell the canvas element to fill its wrapper */
+    /* Canvas element fills its wrapper */
     width: 100%;
     height: 100%;
-    /* --- *** --- */
 }
 
 
@@ -284,6 +282,18 @@ h3 { /* Generic Section Header - used in Toolbar and Log */
 }
 .tool-button[data-tool="INPUT"].active i,
 .tool-button[data-tool="OUTPUT"].active i { color: white; }
+
+/* --- *** NEW STYLE FOR PROPERTIES BUTTON *** --- */
+.tool-button[data-tool="PROPERTIES"] { border-color: var(--props-color); color: var(--props-color); }
+.tool-button[data-tool="PROPERTIES"]:hover,
+.tool-button[data-tool="PROPERTIES"].active {
+    background-color: var(--props-hover);
+    border-color: var(--props-hover);
+    color: white;
+}
+.tool-button[data-tool="PROPERTIES"].active i { color: white; }
+/* --- *** --- */
+
 
 /* Gate Tools (Green) */
 .tool-button[data-tool="NOT"],
@@ -613,7 +623,7 @@ h3 { /* Generic Section Header - used in Toolbar and Log */
     }
     .log-header h3 {
         font-size: 0.7rem;
-        }
+    }
     .sim-button {
         width: 24px;
         height: 24px;
@@ -636,7 +646,7 @@ h3 { /* Generic Section Header - used in Toolbar and Log */
     /* Make AI modal full-width on small screens */
     #ai-modal {
         width: 95%;
-        max-height: 90vh; /* Allow more vertical space */
+.max-height: 90vh; /* Allow more vertical space */
     }
     
     #properties-popup {

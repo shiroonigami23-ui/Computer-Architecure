@@ -1,0 +1,875 @@
+/* --- 1. Global & Font Setup --- */
+:root {
+    --primary-color: #007bff;
+    --primary-hover: #0056b3;
+    --run-color: #28a745;
+    --run-hover: #1e7e34;
+    --pause-color: #fd7e14;
+    --pause-hover: #d36307;
+    --reset-color: #dc3545;
+    --reset-hover: #b02a37;
+    --delete-color: #dc3545;
+    --delete-hover: #b02a37;
+    --ai-color: #6f42c1;
+    --ai-hover: #5a32a3;
+
+    /* --- Cheerful Button Colors --- */
+    --select-color: #007bff;
+    --select-hover: #0056b3;
+    --wire-color: #fd7e14;
+    --wire-hover: #d36307;
+    --io-color: #17a2b8; /* Teal */
+    --io-hover: #117a8b;
+    --gate-color: #28a745; /* Green */
+    --gate-hover: #1e7e34;
+    --export-color: #6c757d; /* Grey */
+    --export-hover: #5a6268;
+    /* --- NEW --- */
+    --save-color: #007bff; /* Same as select */
+    --save-hover: #0056b3;
+    --load-color: #20c997; /* New Mint color */
+    --load-hover: #17a77e;
+    /* --- --- */
+
+    --bg-light: #ffffff;
+    --bg-medium: #f8f9fa;
+    --bg-dark: #e9ecef;
+    --border-color: #dee2e6;
+    --text-color: #333;
+    --text-muted: #6c757d;
+    --log-step-color: #007bff;
+    --log-calc-color: #28a745;
+    --log-error-color: #dc3545;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Prevent body scrollbars */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-medium);
+    color: var(--text-color);
+    -webkit-font-smoothing: antialiased; /* Smoother fonts */
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h2 { /* Toolbar Header */
+    color: var(--text-muted);
+    padding-left: 10px;
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+    margin-top: 10px;
+    user-select: none;
+}
+
+h3 { /* Generic Section Header - used in Toolbar and Log */
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 15px; /* Spacing between sections */
+    padding-bottom: 5px;
+    user-select: none;
+}
+
+/* --- 2. Main Layout --- */
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100vh; /* Use viewport height */
+}
+
+.toolbar {
+    width: 200px;
+    min-width: 180px; /* Prevent shrinking too much */
+    background-color: var(--bg-light);
+    border-right: 1px solid var(--border-color);
+    padding: 0 10px 10px 10px; /* Add bottom padding */
+    overflow-y: auto; /* Allow toolbar scrolling if needed */
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.toolbar-header {
+    flex-shrink: 0; /* Keep header visible */
+    position: sticky; /* Make header stick slightly */
+    top: 0;
+    background-color: var(--bg-light); /* Needed for sticky */
+    z-index: 10;
+    padding-top: 5px;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Prevent content spilling */
+    background-color: var(--bg-dark); /* Darker background for main area */
+}
+
+#canvas-wrapper {
+    flex-grow: 1; /* Takes up space between log and status */
+    position: relative; /* Needed for absolute positioning of canvas */
+    background-color: var(--bg-light); /* Fallback/border color */
+    /* --- VIRTUAL CANVAS FIX --- */
+    overflow: hidden; /* We handle panning in JS, not with scrollbars */
+    /* --- --- */
+    -webkit-overflow-scrolling: touch; 
+}
+
+#simulation-canvas {
+    display: block;
+    background-color: #fff;
+    /* --- VIRTUAL CANVAS FIX --- */
+    /* --- *** THE FIX IS HERE *** --- */
+    /* Tell the canvas element to fill its wrapper */
+    width: 100%;
+    height: 100%;
+    /* --- *** --- */
+}
+
+
+/* --- 3. Toolbar Sections (Collapsible) --- */
+.tool-section {
+    margin-bottom: 0; /* Remove bottom margin, rely on header margin */
+    flex-shrink: 0;
+}
+
+.collapsible-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 8px 0 8px 10px; /* Consistent padding */
+    margin-top: 10px; /* Spacing above header */
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.15s ease;
+}
+.collapsible-header:hover {
+    background-color: var(--bg-dark);
+}
+
+.collapse-icon {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+    margin-right: 5px;
+    color: var(--text-muted);
+}
+
+/* Style for when section is collapsed */
+.tool-section.collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+.tool-section.collapsed .tool-section-content {
+    /* Use max-height for smooth transition */
+    max-height: 0;
+    overflow: hidden;
+    padding-top: 0;
+    opacity: 0;
+}
+
+.tool-section-content {
+    padding-top: 10px; /* Space above buttons */
+    /* Smooth transition for collapsing/expanding */
+    max-height: 1000px; /* Large enough for content */
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding-top 0.3s ease-out, opacity 0.2s ease-in;
+}
+
+
+/* --- 4. Tool Buttons Styling --- */
+.tool-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 65px;
+    padding: 8px 4px;
+    margin-bottom: 5px;
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none; /* Prevent text selection on buttons */
+}
+
+/* Make icon and text ignore pointer events so click goes to button */
+.tool-button i,
+.tool-button span {
+    pointer-events: none;
+}
+.tool-button i {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 5px;
+}
+
+.tool-button:hover {
+    background-color: var(--bg-dark);
+    border-color: #adb5bd; /* Slightly darker border on hover */
+}
+
+.tool-button.active {
+    background-color: var(--primary-color);
+    border-color: var(--primary-hover);
+    color: white;
+}
+.tool-button.active i { color: white; } /* Ensure icon inherits color */
+
+/* Special button styles */
+.tool-button.tool-delete:hover,
+.tool-button.tool-delete.active {
+    background-color: var(--delete-color);
+    border-color: var(--delete-hover);
+    color: white;
+}
+.tool-button.tool-delete.active i { color: white; }
+
+.tool-button.tool-ai { border-color: var(--ai-color); color: var(--ai-color); }
+.tool-button.tool-ai:hover,
+.tool-button.tool-ai.active {
+    background-color: var(--ai-hover);
+    border-color: var(--ai-hover);
+    color: white;
+}
+.tool-button.tool-ai.active i { color: white; }
+
+/* --- 4b. Cheerful Tool Button Colors --- */
+
+/* Select Tool (Primary Blue) */
+.tool-button[data-tool="SELECT"] { border-color: var(--select-color); color: var(--select-color); }
+.tool-button[data-tool="SELECT"]:hover,
+.tool-button[data-tool="SELECT"].active {
+    background-color: var(--select-hover);
+    border-color: var(--select-hover);
+    color: white;
+}
+.tool-button[data-tool="SELECT"].active i { color: white; }
+
+
+/* Wire Tool (Orange) */
+.tool-button[data-tool="WIRE"] { border-color: var(--wire-color); color: var(--wire-color); }
+.tool-button[data-tool="WIRE"]:hover,
+.tool-button[data-tool="WIRE"].active {
+    background-color: var(--wire-hover);
+    border-color: var(--wire-hover);
+    color: white;
+}
+.tool-button[data-tool="WIRE"].active i { color: white; }
+
+/* Input/Output Tools (Teal) */
+.tool-button[data-tool="INPUT"],
+.tool-button[data-tool="OUTPUT"] { border-color: var(--io-color); color: var(--io-color); }
+.tool-button[data-tool="INPUT"]:hover,
+.tool-button[data-tool="INPUT"].active,
+.tool-button[data-tool="OUTPUT"]:hover,
+.tool-button[data-tool="OUTPUT"].active {
+    background-color: var(--io-hover);
+    border-color: var(--io-hover);
+    color: white;
+}
+.tool-button[data-tool="INPUT"].active i,
+.tool-button[data-tool="OUTPUT"].active i { color: white; }
+
+/* Gate Tools (Green) */
+.tool-button[data-tool="NOT"],
+.tool-button[data-tool="AND"],
+.tool-button[data-tool="OR"],
+.tool-button[data-tool="XOR"],
+.tool-button[data-tool="NAND"],
+.tool-button[data-tool="NOR"],
+.tool-button[data-tool="XNOR"] { border-color: var(--gate-color); color: var(--gate-color); }
+
+.tool-button[data-tool="NOT"]:hover,
+.tool-button[data-tool="NOT"].active,
+.tool-button[data-tool="AND"]:hover,
+.tool-button[data-tool="AND"].active,
+.tool-button[data-tool="OR"]:hover,
+.tool-button[data-tool="OR"].active,
+.tool-button[data-tool="XOR"]:hover,
+.tool-button[data-tool="XOR"].active,
+.tool-button[data-tool="NAND"]:hover,
+.tool-button[data-tool="NAND"].active,
+.tool-button[data-tool="NOR"]:hover,
+.tool-button[data-tool="NOR"].active,
+.tool-button[data-tool="XNOR"]:hover,
+.tool-button[data-tool="XNOR"].active {
+    background-color: var(--gate-hover);
+    border-color: var(--gate-hover);
+    color: white;
+}
+.tool-button[data-tool="NOT"].active i,
+.tool-button[data-tool="AND"].active i,
+.tool-button[data-tool="OR"].active i,
+.tool-button[data-tool="XOR"].active i,
+.tool-button[data-tool="NAND"].active i,
+.tool-button[data-tool="NOR"].active i,
+.tool-button[data-tool="XNOR"].active i { color: white; }
+
+/* Export Button (Grey) */
+#export-png-btn { border-color: var(--export-color); color: var(--export-color); }
+#export-png-btn:hover {
+    background-color: var(--export-hover);
+    border-color: var(--export-hover);
+    color: white;
+}
+
+/* --- NEW: Save/Load Button Colors --- */
+#save-circuit-btn { border-color: var(--save-color); color: var(--save-color); }
+#save-circuit-btn:hover {
+    background-color: var(--save-hover);
+    border-color: var(--save-hover);
+    color: white;
+}
+#load-circuit-btn { border-color: var(--load-color); color: var(--load-color); }
+#load-circuit-btn:hover {
+    background-color: var(--load-hover);
+    border-color: var(--load-hover);
+    color: white;
+}
+
+/* --- 5. Log Panel & Sim Controls (UPDATED Layout) --- */
+#log-wrapper {
+    /* Make log smaller */
+    height: 100px; /* Reduced height */
+    flex-shrink: 0; /* Prevent shrinking */
+    background-color: var(--bg-light);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px; /* Padding for header only */
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    height: 40px; /* Give header a fixed height */
+}
+
+.log-header h3 {
+    margin: 0; /* Remove default margins */
+    padding: 0;
+    border-bottom: none;
+    font-size: 0.75rem; /* Smaller header */
+    color: var(--text-muted);
+}
+
+.sim-controls {
+    display: flex;
+    align-items: center;
+}
+
+/* Make sim buttons slightly smaller */
+.sim-button {
+    width: 28px; /* Smaller */
+    height: 28px; /* Smaller */
+    margin-left: 8px; /* Use margin-left for spacing */
+    margin-right: 0;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0; /* Remove padding if any */
+}
+
+.sim-button i {
+    width: 14px; /* Smaller icon */
+    height: 14px;
+    color: white;
+}
+
+/* Sim button colors (no change) */
+.sim-button.run { background-color: var(--run-color); }
+.sim-button.run:hover { background-color: var(--run-hover); }
+.sim-button.pause { background-color: var(--pause-color); }
+.sim-button.pause:hover { background-color: var(--pause-hover); }
+.sim-button.reset { background-color: var(--reset-color); }
+.sim-button.reset:hover { background-color: var(--reset-hover); }
+/* --- NEW: AI-themed sim button --- */
+.sim-button.ai { background-color: var(--ai-color); }
+.sim-button.ai:hover { background-color: var(--ai-hover); }
+
+
+#log-content {
+    flex-grow: 1; /* Fill remaining space in wrapper */
+    overflow-y: auto; /* Enable vertical scroll */
+    padding: 8px 10px; /* Adjust padding */
+    font-size: 0.75rem; /* Even smaller font */
+    font-family: "Menlo", "Consolas", "Courier New", Courier, monospace; /* Monospace for logs */
+    line-height: 1.4;
+    background-color: var(--bg-medium); /* Slightly different background */
+}
+
+/* Log entry styling (minor adjustments) */
+.log-entry { padding: 1px 5px; margin-bottom: 2px; border-radius: 3px; }
+.log-step { color: var(--log-step-color); font-weight: bold; }
+.log-calc { color: var(--log-calc-color); }
+.log-error { color: var(--log-error-color); background-color: #ffebee; font-weight: bold; }
+.log-entry code { background-color: var(--bg-dark); padding: 1px 4px; border-radius: 3px; font-size: 0.7rem;}
+
+
+/* --- 6. Status Bar --- */
+.status-bar {
+    height: 30px; /* Smaller */
+    background-color: var(--bg-light);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    flex-shrink: 0;
+}
+
+#status-text {
+    font-size: 0.75rem; /* Smaller */
+    color: var(--text-muted);
+}
+
+/* --- 7. AI Modal Styles (Unchanged) --- */
+.hidden { display: none !important; }
+#ai-modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+#ai-modal { width: 90%; max-width: 600px; max-height: 80vh; background-color: var(--bg-light); border-radius: 12px; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2); display: flex; flex-direction: column; overflow: hidden; }
+.ai-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; background-color: var(--bg-medium); border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+.ai-header h3 { margin: 0; border: none; padding: 0; font-size: 1.1rem; color: var(--text-color); display: flex; align-items: center; }
+.ai-header h3 i { width: 20px; height: 20px; margin-right: 8px; color: var(--ai-color); }
+.ai-close { background: none; border: none; cursor: pointer; padding: 5px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.ai-close:hover { background-color: var(--bg-dark); }
+.ai-close i { width: 20px; height: 20px; color: var(--text-muted); }
+#ai-chat-history { flex-grow: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
+.ai-message { padding: 10px 14px; border-radius: 18px; line-height: 1.5; max-width: 85%; word-wrap: break-word; font-size: 0.9rem; }
+.ai-message.assistant { background-color: var(--bg-dark); border-bottom-left-radius: 4px; align-self: flex-start; }
+.ai-message.user { background-color: var(--primary-color); color: white; border-bottom-right-radius: 4px; align-self: flex-end; }
+#ai-input-area { display: flex; align-items: flex-end; padding: 10px; border-top: 1px solid var(--border-color); flex-shrink: 0; }
+#ai-prompt-input { flex-grow: 1; border: 1px solid var(--border-color); border-radius: 20px; padding: 10px 15px; font-size: 0.9rem; font-family: inherit; resize: none; max-height: 100px; overflow-y: auto; line-height: 1.4; }
+#ai-prompt-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(0,123,255,0.25); }
+#ai-send-btn { flex-shrink: 0; width: 40px; height: 40px; border: none; background-color: var(--primary-color); color: white; border-radius: 50%; margin-left: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; }
+#ai-send-btn:hover { background-color: var(--primary-hover); }
+#ai-send-btn:disabled { background-color: #a0cfff; cursor: default; }
+#ai-send-btn i { width: 20px; height: 20px; }
+#ai-status { padding: 5px 15px 10px 15px; font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 25px; }
+#ai-status i { width: 14px; height: 14px; }
+#ai-loading i { animation: spin 1s linear infinite; }
+#ai-error { color: var(--log-error-color); font-weight: bold;}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* --- 8. NEW: Floating Properties Popup --- */
+
+#properties-popup {
+    position: absolute; /* Positioned relative to the #canvas-wrapper */
+    background-color: rgba(255, 255, 255, 0.9); /* Cheerful, slightly transparent */
+    backdrop-filter: blur(5px); /* Frosted glass effect */
+    border: 1px solid var(--border-color);
+    border-radius: 12px; /* Nicely rounded */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    z-index: 5;
+    padding: 12px;
+    width: 220px;
+    /* --- Pop-in animation --- */
+    transform: scale(0.95);
+    opacity: 0;
+    transition: transform 0.15s ease-out, opacity 0.15s ease-out;
+    pointer-events: none; /* Allows clicking "through" it when hidden */
+}
+
+#properties-popup.visible {
+    transform: scale(1);
+    opacity: 1;
+    pointer-events: auto; /* Allow interaction when visible */
+}
+
+/* --- 9. NEW: Popup Content Styles --- */
+
+/* Clearer, more "designed" property rows */
+.prop-row {
+    display: flex;
+    flex-direction: column; /* Stack label on top of input */
+    margin-bottom: 12px;
+}
+.prop-row:last-child {
+    margin-bottom: 0;
+}
+
+.prop-row label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+/* Style for inputs and selects */
+.prop-row input[type="text"],
+.prop-row select {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    background-color: var(--bg-light); /* Solid background */
+}
+
+.prop-row input[type="text"]:focus,
+.prop-row select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+
+/* Optional: Style scrollbars for a cleaner look (WebKit browsers) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-medium); }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+
+/* --- 10. NEW: Responsive (Mobile) Styles --- */
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column; /* Stack main content on top of toolbar */
+    }
+
+    .main-content {
+        order: 1; /* Show main content first */
+        flex-grow: 1; 
+        overflow: hidden; 
+    }
+    
+    .toolbar {
+        order: 2; /* Show toolbar at the bottom */
+        width: 100%;
+        min-width: 100%;
+        height: auto; /* --- MODIFIED: Auto height based on content --- */
+        max-height: 40vh; /* But don't let it take over */
+        border-right: none;
+        border-top: 1px solid var(--border-color);
+        overflow-y: auto; /* --- MODIFIED: Allow vertical scroll if sections open --- */
+        overflow-x: hidden;
+        padding: 0 5px 5px 5px; /* Adjust padding for mobile */
+    }
+    
+    .tool-section {
+        flex-shrink: 0;
+    }
+    
+    .collapsible-header {
+         padding: 10px 8px; /* Bigger tap target */
+         margin-top: 5px;
+    }
+    
+    .tool-section-content {
+        display: flex;
+        flex-direction: row; /* --- MODIFIED: Lay out buttons in a row --- */
+        overflow-x: auto; /* --- MODIFIED: Allow horizontal scrolling for buttons --- */
+        overflow-y: hidden;
+        padding-top: 5px;
+        padding-bottom: 5px; /* Add padding for scrollbar */
+    }
+    
+    /* Give buttons a fixed width so they scroll nicely */
+    .tool-button {
+        flex: 0 0 75px; /* --- MODIFIED: Fixed width, don't grow or shrink --- */
+        width: 75px;
+        height: 60px; /* Slightly shorter */
+        margin-right: 5px; /* Space between buttons */
+        margin-bottom: 0;
+    }
+    .tool-button span {
+        font-size: 0.7rem; /* Slightly smaller text */
+    }
+    .tool-button i {
+        width: 20px;
+        height: 20px;
+    }
+    
+    /* Make log wrapper and controls smaller */
+    #log-wrapper {
+        height: 80px; 
+    }
+    .log-header {
+        height: 35px;
+    }
+    .log-header h3 {
+        font-size: 0.7rem;
+        }
+    .sim-button {
+        width: 24px;
+        height: 24px;
+        margin-left: 6px;
+    }
+    .sim-button i {
+        width: 12px;
+        height: 12px;
+    }
+    
+    /* Make status bar smaller */
+    .status-bar {
+        height: 25px;
+        padding: 0 10px;
+    }
+    #status-text {
+        font-size: 0.7rem;
+    }
+    
+    /* Make AI modal full-width on small screens */
+    #ai-modal {
+        width: 95%;
+        max-height: 90vh; /* Allow more vertical space */
+    }
+    
+    #properties-popup {
+        width: 180px; /* Smaller popup */
+        padding: 10px;
+    }
+    .prop-row input[type="text"], .prop-row select {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+}
+
+/* --- 11. NEW: Save/Load Modal Styles --- */
+
+/* Generic backdrop for all new modals */
+#save-modal-backdrop,
+#load-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Use the same style as the AI modal */
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    /* --- NEW: Fade-in animation --- */
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+/* Show animation */
+#save-modal-backdrop:not(.hidden),
+#load-modal-backdrop:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Generic dialog box */
+.modal-dialog {
+    width: 90%;
+    max-width: 450px; /* Slightly smaller than AI modal */
+    background-color: var(--bg-light);
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* --- NEW: Pop-in animation --- */
+    transform: scale(0.95);
+    transition: transform 0.2s ease;
+}
+#save-modal-backdrop:not(.hidden) .modal-dialog,
+#load-modal-backdrop:not(.hidden) .modal-dialog {
+    transform: scale(1);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+    background-color: var(--bg-medium);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+.modal-header h3 {
+    margin: 0;
+    border: none;
+    padding: 0;
+    font-size: 1.1rem;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+}
+.modal-header h3 i {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    color: var(--primary-color);
+}
+/* Specific header colors */
+#load-modal .modal-header h3 i { color: var(--load-color); }
+
+.modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close:hover { background-color: var(--bg-dark); }
+.modal-close i { width: 20px; height: 20px; color: var(--text-muted); }
+
+.modal-content {
+    flex-grow: 1;
+    padding: 20px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+.modal-content p {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+.modal-content p:last-child {
+    margin-bottom: 0;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 15px;
+    background-color: var(--bg-medium);
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.modal-button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+}
+.modal-button.confirm {
+    background-color: var(--primary-color);
+    color: white;
+}
+.modal-button.confirm:hover { background-color: var(--primary-hover); }
+.modal-button.cancel {
+    background-color: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+.modal-button.cancel:hover { background-color: var(--bg-dark); }
+
+
+/* --- 12. NEW: Specific Modal Content Styles --- */
+
+/* --- Save Modal --- */
+.save-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#save-circuit-name {
+    flex-grow: 1;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+#save-circuit-name:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+#ai-name-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#ai-name-loading i {
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+    animation: spin 1s linear infinite;
+}
+
+
+/* --- Load Modal --- */
+#load-circuit-list {
+    max-height: 40vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-medium);
+}
+.load-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.load-item:last-child {
+    border-bottom: none;
+}
+.load-item:hover {
+    background-color: var(--bg-dark);
+}
+.load-item-name {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+.load-item-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.load-item-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+.load-item-delete i {
+    width: 16px;
+    height: 16px;
+    color: var(--delete-color);
+}
+.load-item:hover .load-item-delete {
+    opacity: 1;
+}
+.load-item-delete:hover {
+    background-color: #ffebee;
+}

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Logisim - Digital Logic Simulator</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- *** ICON FIX *** -->
+    <!-- Use the full, reliable UMD file from a CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <!-- *** --- *** -->
+</head>
+<body>
+
+    <!-- Main Application Wrapper -->
+    <div class="app-container">
+
+        <!-- Toolbar (content unchanged) -->
+        <div class="toolbar">
+            <div class="toolbar-header">
+                <h2>Tools</h2>
+            </div>
+            <div class="tool-section">
+                <h3 class="collapsible-header">
+                    Controls <span class="collapse-icon">▼</span>
+                </h3>
+                <div class="tool-section-content">
+                    <button class="tool-button active" data-tool="SELECT" title="Select & Drag (V)">
+                        <i data-lucide="mouse-pointer-2"></i>
+                        <span>Select</span>
+                    </button>
+                    <button class="tool-button" data-tool="WIRE" title="Draw Wires (W)">
+                        <i data-lucide="share-2"></i>
+                        <span>Wire</span>
+                    </button>
+                    <button class="tool-button tool-delete" data-tool="DELETE" title="Delete (D)">
+                        <i data-lucide="trash-2"></i>
+                        <span>Delete</span>
+                    </button>
+                    <button class="tool-button tool-ai" data-tool="AI" title="AI Assistant (A)">
+                        <i data-lucide="sparkles"></i>
+                        <span>AI Assistant</span>
+                    </button>
+                </div>
+            </div>
+            <div class="tool-section">
+                <h3 class="collapsible-header">
+                    Components <span class="collapse-icon">▼</span>
+                </h3>
+                <div class="tool-section-content">
+                    <button class="tool-button" data-tool="INPUT" title="Input Toggle">
+                        <i data-lucide="toggle-left"></i>
+                        <span>Input</span>
+                    </button>
+                    <button class="tool-button" data-tool="OUTPUT" title="Output LED">
+                        <i data-lucide="lightbulb"></i>
+                        <span>Output</span>
+                    </button>
+                </div>
+            </div>
+            <div class="tool-section">
+                <h3 class="collapsible-header">
+                    Gates <span class="collapse-icon">▼</span>
+                </h3>
+                <div class="tool-section-content">
+                    <button class="tool-button" data-tool="NOT" title="NOT Gate"> <i data-lucide="circle-slash"></i> <span>NOT</span> </button>
+                    <button class="tool-button" data-tool="AND" title="AND Gate"> <i data-lucide="circle-dot"></i> <span>AND</span> </button>
+                    <button class="tool-button" data-tool="OR" title="OR Gate"> <i data-lucide="circle"></i> <span>OR</span> </button>
+                    <button class="tool-button" data-tool="XOR" title="XOR Gate"> <i data-lucide="circle-x"></i> <span>XOR</span> </button>
+                    <button class="tool-button" data-tool="NAND" title="NAND Gate"> <i data-lucide="circle-dot-dashed"></i> <span>NAND</span> </button>
+                    <button class="tool-button" data-tool="NOR" title="NOR Gate"> <i data-lucide="circle-dashed"></i> <span>NOR</span> </button>
+                    <button class="tool-button" data-tool="XNOR" title="XNOR Gate"> <i data-lucide="circle-x-dashed"></i> <span>XNOR</span> </button>
+                </div>
+            </div>
+            <div class="tool-section">
+                <h3 class="collapsible-header">
+                    Project <span class="collapse-icon">▼</span>
+                </h3>
+                <div class="tool-section-content">
+                    <button class="tool-button" id="save-circuit-btn" data-tool="SAVE" title="Save As...">
+                        <i data-lucide="save"></i>
+                        <span>Save As...</span>
+                    </button>
+                    <button class="tool-button" id="load-circuit-btn" data-tool="LOAD" title="Load Project">
+                        <i data-lucide="folder-open"></i>
+                        <span>Load Project</span>
+                    </button>
+                    <button class="tool-button" id="export-png-btn" title="Export as PNG">
+                        <i data-lucide="image"></i>
+                        <span>Export PNG</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main content (content unchanged) -->
+        <div class="main-content">
+            <div id="canvas-wrapper">
+                <canvas id="simulation-canvas"></canvas>
+                <div id="properties-popup" class="hidden"></div>
+            </div>
+            <div id="log-wrapper">
+                <div class="log-header">
+                    <h3>Simulation Log</h3>
+                    <div class="sim-controls">
+                        <button class="sim-button reset" id="reset-btn" title="Reset Simulation (R)"> <i data-lucide="rotate-ccw"></i> </button>
+                    </div>
+                </div>
+                <div id="log-content"></div>
+            </div>
+            <div class="status-bar">
+                <span id="status-text">Ready. Select a tool or ask the AI.</span>
+                <span id="coords-display"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals (content unchanged) -->
+    <div id="ai-modal-backdrop" class="hidden">
+        <div id="ai-modal" class="modal-dialog">
+            <div class="ai-header">
+                <h3><i data-lucide="sparkles"></i> AI Circuit Assistant</h3>
+                <button id="ai-close-btn" class="ai-close" title="Close"> <i data-lucide="x"></i> </button>
+            </div>
+            <div id="ai-chat-history">
+                <div class="ai-message assistant"> Hello! What circuit would you like me to build for you? (e.g., "a half-adder" or "an SR latch") </div>
+            </div>
+            <div id="ai-input-area">
+                <textarea id="ai-prompt-input" placeholder="e.g., 'Build an AND gate using only NAND gates'" rows="2"></textarea>
+                <button id="ai-send-btn" title="Send"> <i data-lucide="send"></i> </button>
+            </div>
+            <div id="ai-status">
+                <div id="ai-loading" class="hidden"> <i data-lucide="loader-circle"></i> Thinking... </div>
+                <span id="ai-error" class="hidden"></span>
+            </div>
+        </div>
+    </div>
+    <div id="save-modal-backdrop" class="hidden">
+        <div id="save-modal" class="modal-dialog">
+            <div class="modal-header">
+                <h3><i data-lucide="save"></i> Save Circuit As...</h3>
+                <button id="save-modal-close-btn" class="modal-close" title="Close"> <i data-lucide="x"></i> </button>
+            </div>
+            <div class="modal-content">
+                <p>Enter a name for your circuit. This will be saved in your browser.</p>
+                <div class="save-form">
+                    <input type="text" id="save-circuit-name" placeholder="Loading AI suggestion...">
+                    <div id="ai-name-loading" class="hidden"> <i data-lucide="loader-circle"></i> </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-modal-cancel-btn" class="modal-button cancel">Cancel</button>
+                <button id="save-modal-confirm-btn" class="modal-button confirm">Save</button>
+            </div>
+        </div>
+    </div>
+    <div id="load-modal-backdrop" class="hidden">
+        <div id="load-modal" class="modal-dialog">
+            <div class="modal-header">
+                <h3><i data-lucide="folder-open"></i> Load Circuit</h3>
+                <button id="load-modal-close-btn" class="modal-close" title="Close"> <i data-lucide="x"></i> </button>
+            </div>
+            <div class="modal-content">
+                <p>Select a circuit to load. This will replace your current canvas.</p>
+                <div id="load-circuit-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="load-modal-cancel-btn" class="modal-button cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- *** SCRIPT ORDER UPDATED *** -->
+    <script src="components.js"></script>
+    <script src="simulator.js"></script>
+    <script src="canvas.js"></script>
+    <script src="animation.js"></script>
+    <script src="ai.js"></script>
+    <script src="storage_manager.js"></script>
+    <!-- *** NEW FILE *** -->
+    <script src="input_handler.js"></script>
+    <!-- main.js must be LAST -->
+    <script src="main.js"></script>
+</body>
+</html>
+
+

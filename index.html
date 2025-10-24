@@ -6,12 +6,16 @@
     <title>Web Logisim - Digital Logic Simulator</title>
     <link rel="stylesheet" href="style.css">
 
+    <!-- *** ICON FIX *** -->
+    <!-- Use the full, reliable UMD file from a CDN -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
-    </head>
+</head>
 <body>
 
+    <!-- Main Application Wrapper -->
     <div class="app-container">
 
+        <!-- Toolbar (content unchanged) -->
         <div class="toolbar">
             <div class="toolbar-header">
                 <h2>Tools</h2>
@@ -77,10 +81,12 @@
                     Project <span class="collapse-icon">▼</span>
                 </h3>
                 <div class="tool-section-content">
+                    <!-- *** NEW BUTTON FOR AUTH *** -->
                     <button class="tool-button" id="auth-btn" data-tool="AUTH" title="Login for Cloud Save">
                         <i data-lucide="log-in"></i>
                         <span>Login</span>
                     </button>
+                    <!-- *** --- *** -->
                     <button class="tool-button" id="save-circuit-btn" data-tool="SAVE" title="Save As...">
                         <i data-lucide="save"></i>
                         <span>Save As...</span>
@@ -97,6 +103,7 @@
             </div>
         </div>
 
+        <!-- Main content (content unchanged) -->
         <div class="main-content">
             <div id="canvas-wrapper">
                 <canvas id="simulation-canvas"></canvas>
@@ -118,6 +125,7 @@
         </div>
     </div>
 
+    <!-- Modals (content unchanged) -->
     <div id="ai-modal-backdrop" class="hidden">
         <div id="ai-modal" class="modal-dialog">
             <div class="ai-header">
@@ -172,10 +180,18 @@
         </div>
     </div>
 
+    <!-- *** SCRIPT ORDER UPDATED *** -->
+    
+    <!-- *** NEW: FIREBASE SDK *** -->
     <script type="module">
         // These are the core Firebase libraries we'll need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // --- MODIFIED: Added Google Auth functions ---
+        import { 
+            getAuth, onAuthStateChanged, signInAnonymously,
+            GoogleAuthProvider, signInWithPopup, signOut
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // --- ---
         import { 
             getFirestore, doc, getDoc, setDoc, deleteDoc, 
             collection, onSnapshot, query, 
@@ -189,12 +205,18 @@
             getAuth,
             onAuthStateChanged,
             signInAnonymously,
+            // --- NEW ---
+            GoogleAuthProvider,
+            signInWithPopup,
+            signOut,
+            // --- ---
             getFirestore,
             doc, getDoc, setDoc, deleteDoc,
             collection, onSnapshot, query,
             serverTimestamp
         };
     </script>
+
     <script src="components.js"></script>
     <script src="simulator.js"></script>
     <script src="canvas.js"></script>
@@ -206,3 +228,5 @@
     <script src="main.js"></script>
 </body>
 </html>
+
+

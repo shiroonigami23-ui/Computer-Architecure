@@ -1,8 +1,3 @@
-// --- NEW FILE ---
-// This manager handles all Firebase initialization and user authentication.
-// Its job is to get a user signed in and provide the user's ID to other managers.
-
-// --- *** FIX: Added your specific Firebase Config *** ---
 const firebaseConfig = {
   apiKey: "AIzaSyCGRmgpO1bqkn6EMqWLExJLW8R7uTCZpIM",
   authDomain: "computer-arch-169e8.firebaseapp.com",
@@ -22,6 +17,12 @@ const AuthManager = {
     currentUserId: null,
     currentUser: null, // --- NEW: Store the full user object
     
+    // --- NEW: Splash Screen UI ---
+    splashScreen: null,
+    splashLoading: null,
+    splashLoginBtn: null,
+    splashError: null,
+    
     // --- 2. Initialization ---
     
     /**
@@ -31,24 +32,31 @@ const AuthManager = {
     init: function() {
         console.log("Auth Manager initializing...");
         
+        // --- NEW: Get Splash Screen elements ---
+        this.splashScreen = document.getElementById('splash-screen');
+        this.splashLoading = document.getElementById('splash-loading');
+        this.splashLoginBtn = document.getElementById('splash-login-btn');
+        this.splashError = document.getElementById('splash-error');
+        
+        // --- Hook up splash screen login button ---
+        this.splashLoginBtn?.addEventListener('click', () => this.signInWithGoogle());
+        
         try {
             this.initializeFirebase(firebaseConfig);
         } catch (error) {
             console.error("Critical error during AuthManager init:", error);
-            AnimationManager.logError(`Auth Error: ${error.message}`);
-            this.updateAuthButton(null, true); // Show error on button
+            // --- NEW: Show error on splash screen ---
+            this.showSplashError(`Auth Error: ${error.message}`);
         }
         
-        // --- MODIFIED: Add smart listener for Login/Logout ---
+        // --- MODIFIED: This button is now just for LOGOUT ---
         const authButton = document.getElementById('auth-btn');
         authButton?.addEventListener('click', () => {
             if (this.currentUserId) {
                 // If user is logged IN, the button should log them OUT
                 this.signOutUser();
-            } else {
-                // If user is logged OUT, the button should log them IN
-                this.signInWithGoogle();
             }
+            // No 'else' needed, login is handled by splash screen
         });
     },
 
@@ -59,7 +67,7 @@ const AuthManager = {
     initializeFirebase: async function(config) {
         if (!window.firebase) {
             console.error("Firebase SDK not loaded. Auth Manager cannot start.");
-            AnimationManager.logError("Error: Firebase services failed to load.");
+            this.showSplashError("Error: Firebase services failed to load.");
             return;
         }
 
@@ -67,7 +75,6 @@ const AuthManager = {
         const { 
             initializeApp, getAuth, getFirestore, 
             onAuthStateChanged
-            // --- REMOVED: signInAnonymously ---
         } = window.firebase;
 
         try {
@@ -79,48 +86,98 @@ const AuthManager = {
             this.auth = getAuth(this.app);
             this.db = getFirestore(this.app); // Initialize Firestore
 
-            // --- Auth State Listener (Unchanged, but more powerful) ---
+            // --- Auth State Listener ---
+            // This is now the main controller for the app
             onAuthStateChanged(this.auth, (user) => {
                 if (user) {
-                    // User is signed in
+                    // --- User is signed in ---
                     this.currentUserId = user.uid;
-                    this.currentUser = user; // --- NEW: Store user object
+                    this.currentUser = user; 
                     console.log("Firebase Auth: User signed in:", user.displayName, user.uid);
-                    this.updateAuthButton(user);
                     
-                    if (window.StorageManager) {
-                         StorageManager.onUserLogin(this.currentUserId);
-                    }
-                    AnimationManager.logStep(`Welcome, ${user.displayName}! Connected to cloud services.`);
+                    // --- NEW: Launch the main application ---
+                    this.launchApp(user);
                     
                 } else {
-                    // User is signed out
+                    // --- User is signed out ---
                     this.currentUserId = null;
-                    this.currentUser = null; // --- NEW: Clear user object
+                    this.currentUser = null; 
                     console.log("Firebase Auth: User signed out.");
-                    this.updateAuthButton(null);
                     
-                    if (window.StorageManager) {
-                         StorageManager.onUserLogout();
+                    // --- NEW: Show the login button on the splash screen ---
+                    this.showLoginButton();
+
+                    // If the app was visible, hide it and show splash
+                    const appContainer = document.querySelector('.app-container');
+                    if (appContainer && appContainer.classList.contains('app-visible')) {
+                        appContainer.classList.remove('app-visible');
+                        this.splashScreen.classList.remove('hidden');
                     }
-                    AnimationManager.logError("Disconnected from cloud services. Please login to save.");
                 }
             });
-            
-            // --- REMOVED: No more automatic sign-in ---
-            // await signInAnonymously(this.auth);
 
         } catch (error) {
             console.error("Firebase initialization error:", error);
-            AnimationManager.logError(`Auth Error: ${error.message}`);
-            this.updateAuthButton(null, true); // Show error state
+            this.showSplashError(`Firebase Error: ${error.message}`);
         }
     },
+    
+    // --- NEW: Splash Screen UI Functions ---
+    
+    showLoginButton: function() {
+        this.splashLoading?.classList.add('hidden');
+        this.splashError?.classList.add('hidden');
+        this.splashLoginBtn?.classList.remove('hidden');
+        
+        // Make sure icons are drawn
+        if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    },
+    
+    showSplashError: function(message) {
+        this.splashLoading?.classList.add('hidden');
+        this.splashLoginBtn?.classList.add('hidden');
+        this.splashError.textContent = message;
+        this.splashError.classList.remove('hidden');
+    },
+    
+    // --- NEW: App Launcher ---
+    /**
+     * Hides splash screen and initializes all other app managers.
+     * @param {object} user - The Firebase user object
+     */
+    launchApp: function(user) {
+        console.log(`Launching app for ${user.displayName}...`);
+        
+        // --- 1. Hide Splash Screen and Show App ---
+        this.splashScreen?.classList.add('hidden');
+        const appContainer = document.querySelector('.app-container');
+        appContainer?.classList.add('app-visible');
+        
+        // --- 2. Initialize all other managers ---
+        // We do this *after* login is confirmed
+        // (Main.init will call all the others)
+        Main.init(); 
+
+        // --- 3. Update the (now visible) Logout button ---
+        this.updateAuthButton(user);
+        
+        // --- 4. Manually call the onUserLogin functions ---
+        // This is what we removed from onAuthStateChanged
+        if (window.StorageManager) {
+             StorageManager.onUserLogin(this.currentUserId);
+        }
+        if (window.AnimationManager) {
+            AnimationManager.logStep(`Welcome, ${user.displayName}! Connected to cloud services.`);
+        }
+    },
+    
     
     // --- NEW: Google Sign-In Function ---
     signInWithGoogle: async function() {
         if (!this.auth || !window.firebase) {
-            AnimationManager.logError("Auth service is not ready.");
+            this.showSplashError("Auth service is not ready.");
             return;
         }
         
@@ -128,17 +185,23 @@ const AuthManager = {
         const provider = new GoogleAuthProvider();
         
         try {
-            AnimationManager.logStep("Opening Google Sign-In popup...");
+            // --- NEW: Show loading state on splash ---
+            this.splashLoginBtn?.classList.add('hidden');
+            this.splashError?.classList.add('hidden');
+            this.splashLoading?.classList.remove('hidden');
+            
+            console.log("Opening Google Sign-In popup...");
             const result = await signInWithPopup(this.auth, provider);
-            // This will trigger the `onAuthStateChanged` listener,
-            // which will handle the rest of the login flow.
-            AnimationManager.logStep(`Login successful for ${result.user.displayName}`);
+            
+            // Success! The onAuthStateChanged listener will handle launching the app.
+            console.log(`Login successful for ${result.user.displayName}`);
+
         } catch (error) {
             if (error.code === 'auth/popup-closed-by-user') {
-                AnimationManager.logError("Sign-in cancelled.");
+                this.showLoginButton(); // User cancelled, show button again
             } else {
                 console.error("Google Sign-In Error:", error);
-                AnimationManager.logError(`Sign-in failed: ${error.message}`);
+                this.showSplashError(`Sign-in failed: ${error.message}`);
             }
         }
     },
@@ -155,9 +218,16 @@ const AuthManager = {
         try {
             AnimationManager.logStep("Logging out...");
             await signOut(this.auth);
-            // This will trigger the `onAuthStateChanged` listener,
-            // which will handle the rest of the logout flow.
-            AnimationManager.logStep("Logout successful.");
+            
+            // Success! The onAuthStateChanged listener will handle
+            // hiding the app and showing the splash screen.
+            
+            // --- NEW: We must also clear the app state ---
+            // This is critical to prevent seeing old user data on new login
+            Simulator.resetSimulation();
+            
+            console.log("Logout successful.");
+
         } catch (error) {
             console.error("Sign-Out Error:", error);
             AnimationManager.logError(`Sign-out failed: ${error.message}`);
@@ -177,6 +247,7 @@ const AuthManager = {
         const span = authButton.querySelector('span');
 
         if (isError) {
+            // This state should no longer happen, but good to keep
             if (icon) icon.setAttribute('data-lucide', 'alert-triangle');
             if (span) span.textContent = 'Auth Error';
             authButton.title = "Could not connect to authentication services.";
@@ -187,12 +258,13 @@ const AuthManager = {
             if (span) span.textContent = user.displayName || "Account"; // Show user's name
             authButton.title = `Logged in as: ${user.email}\nClick to Log Out.`;
             authButton.classList.remove('tool-delete');
-            authButton.style.borderColor = 'var(--gate-color)'; // Green border
-            authButton.style.color = 'var(--gate-color)';
+            authButton.style.borderColor = 'var(--auth-color)';
+            authButton.style.color = 'var(--auth-color)';
         } else {
-            // --- MODIFIED: Default "Login with Google" state ---
+            // --- MODIFIED: This is the "Logged Out" state ---
+            // This button will be hidden, but we'll style it just in case
             if (icon) icon.setAttribute('data-lucide', 'log-in');
-            if (span) span.textContent = 'Login'; // "Login"
+            if (span) span.textContent = 'Login';
             authButton.title = "Login with Google for Cloud Save";
             authButton.classList.remove('tool-delete');
             authButton.style.borderColor = 'var(--auth-color)';
@@ -222,4 +294,10 @@ const AuthManager = {
     getProjectId: function() {
          return firebaseConfig.projectId;
     }
+};
+
+// --- NEW: Auto-run the AuthManager ---
+// This kicks off the whole process on page load.
+window.onload = () => {
+    AuthManager.init();
 };

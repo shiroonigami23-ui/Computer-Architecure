@@ -20,6 +20,7 @@
         </div>
     </div>
     <div class="app-container">
+        <!-- (All toolbar and main-content HTML is unchanged) -->
         <div class="toolbar">
             <div class="toolbar-header">
                 <h2>Tools</h2>
@@ -124,6 +125,7 @@
             </div>
         </div>
     </div>
+    <!-- (All modal HTML is unchanged) -->
     <div id="ai-modal-backdrop" class="hidden">
         <div id="ai-modal" class="modal-dialog">
             <div class="ai-header">
@@ -177,6 +179,8 @@
             </div>
         </div>
     </div>
+    
+    <!-- (All script tags from before are unchanged) -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -212,27 +216,45 @@
     <script src="storage_manager.js"></script>
     <script src="input_handler.js"></script>
     <script src="main.js"></script>
+
+    <!-- *** UPDATED: App Bootloader Script *** -->
     <script>
         function startApp() {
-            console.log("Lucide is ready. Starting AuthManager...");
+            // This function is now ONLY called when BOTH are ready
+            console.log("Lucide and Firebase are ready. Starting AuthManager...");
             AuthManager.init();
         }
-        function checkLucide() {
-            if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+
+        function checkReady() {
+            // Check if both libraries are loaded and ready
+            const lucideReady = (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function');
+            const firebaseReady = (typeof window.firebase !== 'undefined' && typeof window.firebase.initializeApp === 'function');
+
+            if (lucideReady && firebaseReady) {
+                // --- BOTH ARE READY ---
                 try {
+                    // 1. Create splash icons *first*
                     lucide.createIcons();
                     console.log("Splash screen icons created.");
                 } catch (e) {
                     console.warn("Could not draw splash icons", e);
                 }
+                
+                // 2. Start the app
                 startApp();
+
             } else {
-                console.log("Waiting for Lucide to load...");
-                setTimeout(checkLucide, 50); // Check every 50ms
+                // --- NOT READY ---
+                if (!lucideReady) console.log("Waiting for Lucide to load...");
+                if (!firebaseReady) console.log("Waiting for Firebase SDK to load...");
+                setTimeout(checkReady, 50); // Check again in 50ms
             }
         }
-checkLucide();
+
+        // Start the check
+        checkReady();
     </script>
+    <!-- *** --- *** -->
 </body>
 </html>
 

@@ -182,6 +182,8 @@
     
     <!-- (All script tags from before are unchanged) -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    
+    <!-- *** UPDATED FIREBASE SCRIPT *** -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
@@ -193,6 +195,8 @@
             collection, onSnapshot, query, 
             serverTimestamp 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // 1. Populate the global window object
         window.firebase = {
             initializeApp,
             getAuth,
@@ -206,7 +210,12 @@
             collection, onSnapshot, query,
             serverTimestamp
         };
+        
+        // 2. *** NEW: Set the flag to true *after* all imports are done ***
+        window.firebaseReady = true;
+        console.log("Firebase SDK is ready.");
     </script>
+    
     <script src="components.js"></script>
     <script src="simulator.js"></script>
     <script src="canvas.js"></script>
@@ -224,35 +233,40 @@
             console.log("Lucide and Firebase are ready. Starting AuthManager...");
             AuthManager.init();
         }
+        
+        function checkFirebase() {
+            // This function waits for the module script to set the flag
+            if (window.firebaseReady === true) {
+                // 2. Firebase is ready, start the app
+                startApp();
+            } else {
+                // Firebase module is still loading...
+                console.log("Waiting for Firebase SDK to load...");
+                setTimeout(checkFirebase, 50); // Check again
+            }
+        }
 
-        function checkReady() {
-            // Check if both libraries are loaded and ready
-            const lucideReady = (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function');
-            const firebaseReady = (typeof window.firebase !== 'undefined' && typeof window.firebase.initializeApp === 'function');
-
-            if (lucideReady && firebaseReady) {
-                // --- BOTH ARE READY ---
+        function checkLucide() {
+            // This function runs first
+            if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+                // 1. Lucide is ready, draw the spinner
                 try {
-                    // 1. Create splash icons *first*
                     lucide.createIcons();
                     console.log("Splash screen icons created.");
                 } catch (e) {
                     console.warn("Could not draw splash icons", e);
                 }
-                
-                // 2. Start the app
-                startApp();
-
+                // Now that icons are drawn, wait for Firebase
+                checkFirebase();
             } else {
-                // --- NOT READY ---
-                if (!lucideReady) console.log("Waiting for Lucide to load...");
-                if (!firebaseReady) console.log("Waiting for Firebase SDK to load...");
-                setTimeout(checkReady, 50); // Check again in 50ms
+                // Lucide script is still loading...
+                console.log("Waiting for Lucide to load...");
+                setTimeout(checkLucide, 50); // Check again
             }
         }
 
-        // Start the check
-        checkReady();
+        // Start the entire boot process
+        checkLucide();
     </script>
     <!-- *** --- *** -->
 </body>

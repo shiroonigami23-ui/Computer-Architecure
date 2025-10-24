@@ -84,12 +84,95 @@ h3 { /* Generic Section Header - used in Toolbar and Log */
     user-select: none;
 }
 
+/* --- 1b. NEW: Splash Screen Styles --- */
+#splash-screen {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-light);
+    transition: opacity 0.3s ease-out;
+}
+
+#splash-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+}
+
+#splash-title {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 20px;
+}
+
+#splash-loading {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+/* Make the loader icon spin */
+#splash-loading i {
+    width: 20px;
+    height: 20px;
+    animation: spin 1.5s linear infinite;
+}
+
+#splash-login-btn {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: white;
+    background-color: var(--primary-color);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    margin-top: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background-color 0.2s ease;
+}
+#splash-login-btn:hover {
+    background-color: var(--primary-hover);
+}
+#splash-login-btn i {
+    width: 20px;
+    height: 20px;
+}
+
+#splash-error {
+    font-size: 0.9rem;
+    color: var(--log-error-color);
+    margin-top: 20px;
+    font-weight: 500;
+}
+/* --- --- */
+
+
 /* --- 2. Main Layout --- */
 .app-container {
-    display: flex;
+    /* --- MODIFIED: Hide app by default --- */
+    display: none; 
+    /* --- --- */
     width: 100%;
     height: 100vh; /* Use viewport height */
+    opacity: 0; /* For fade-in */
+    transition: opacity 0.3s ease-in;
 }
+
+/* --- NEW: Class to show the app --- */
+.app-container.app-visible {
+    display: flex;
+    opacity: 1;
+}
+/* --- --- */
 
 .toolbar {
     width: 200px;
@@ -670,6 +753,16 @@ h3 { /* Generic Section Header - used in Toolbar and Log */
         padding: 6px 8px;
         font-size: 0.8rem;
     }
+
+    /* --- NEW: Mobile Splash Screen --- */
+    #splash-title {
+        font-size: 2.5rem;
+    }
+    #splash-login-btn {
+        font-size: 1rem;
+        padding: 10px 20px;
+    }
+    /* --- --- */
 }
 
 /* --- 11. NEW: Save/Load Modal Styles --- */
@@ -895,4 +988,4 @@ h3 { /* Generic Section Header - used in Toolbar and Log */
 }
 .load-item-delete:hover {
     background-color: #ffebee;
-    }
+}

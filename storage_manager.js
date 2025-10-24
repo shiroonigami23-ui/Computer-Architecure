@@ -402,6 +402,9 @@ const StorageManager = {
             item.appendChild(deleteBtn);
             this.loadList.appendChild(item);
         }
-        
-        
-};
+        // Refresh icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+        };

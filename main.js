@@ -19,6 +19,7 @@ const Main = {
     GRID_SIZE: 20, 
 
     // --- 2. Main Initialization ---
+    // --- MODIFIED: This is now called by AuthManager.launchApp() ---
     init: function() {
         console.log("Web-Logisim initializing...");
 
@@ -72,33 +73,21 @@ const Main = {
         
         // --- *** ICON FIX: MOVED HERE *** ---
         // This runs *after* Main.init() is complete and the app is visible
+        // This is safe because the bootloader already checked that lucide is loaded
         setTimeout(() => {
             try {
-                console.log("Attempting to create icons...");
+                console.log("Attempting to create app icons...");
                 if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
                     lucide.createIcons();
-                    console.log("Icons created successfully.");
+                    console.log("App icons created successfully.");
                 } else {
-                    throw new Error("lucide.createIcons is not available. Retrying...");
+                    throw new Error("lucide.createIcons is not available.");
                 }
             } catch (iconError) {
-                console.warn("Lucide icons failed to load. Retrying in 1s...", iconError);
-                // Second attempt, just in case
-                setTimeout(() => {
-                     try {
-                         if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-                            lucide.createIcons();
-                            console.log("Icons created on second attempt.");
-                         } else {
-                             throw new Error("Lucide still not loaded.");
-                         }
-                     } catch (e) {
-                          console.error("Gave up trying to load icons.", e);
-                          AnimationManager.logError("Warning: Could not load icons.");
-                     }
-                }, 1000); // 1 second delay for retry
+                console.error("Failed to create app icons.", iconError);
+                AnimationManager.logError("Warning: Could not load app icons.");
             }
-        }, 100); // 100ms delay after main.init
+        }, 100); // 100ms delay to let the app render
         // --- *** END ICON FIX *** ---
     },
 
@@ -155,7 +144,7 @@ const Main = {
                 this.setActiveTool(toolName); 
 
             } else if (header) { 
-                const section = header.closest('.collapsible-header');
+                const section = header.closest('.tool-section');
                 if (!section) return;
 
                 section.classList.toggle('collapsed');
@@ -522,8 +511,7 @@ const Main = {
         if (popupY < 10) {
             popupY = 10;
         }
-        
-        this.propertiesPopup.style.left = `${popupX}px`;
+       this.propertiesPopup.style.left = `${popupX}px`;
         this.propertiesPopup.style.top = `${popupY}px`;
     },
 
@@ -597,5 +585,4 @@ const Main = {
 
 // --- Global Entry Point ---
 // --- MODIFIED: This is no longer the main entry point ---
-// AuthManager.init() is now the entry point, called by window.onload
-// in auth_manager.js
+// The bootloader in index.html handles this.

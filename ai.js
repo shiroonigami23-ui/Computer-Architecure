@@ -2,7 +2,23 @@
 
 const AIManager = {
     // --- Configuration ---
-    // Stricter prompt emphasizing required fields
+    
+    // --- NEW: Centralized API config ---
+    API_KEY: "AIzaSyBGdlO5vH4bNMOZSOu6ZzYZN4Rg1eYCMN4", // API key is injected
+    API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent",
+
+    // --- NEW: System prompt for NAMING circuits ---
+    NAME_SYSTEM_PROMPT: `
+You are a helpful assistant. A user will provide a JSON object representing a logic circuit (components and wires).
+Your one and only job is to analyze this circuit and respond with a concise, descriptive name for it (e.g., "Full Adder", "4-bit Multiplexer", "SR Latch").
+- Respond with ONLY the name as a plain string.
+- Do not add any explanation, quotation marks, or introductory text.
+- If the circuit is simple or unclear, just call it "My Logic Circuit".
+Example Input: {"components":[{"type":"INPUT"},{"type":"INPUT"},{"type":"XOR"},{"type":"AND"},{"type":"OUTPUT"},{"type":"OUTPUT"}...]}
+Example Output: Half Adder
+`,
+
+    // --- System prompt for BUILDING circuits ---
     SYSTEM_PROMPT: `
 You are an expert logic circuit designer inside a web simulator. Your ONLY goal is to help a user build a circuit by providing a step-by-step JSON plan.
 
@@ -49,9 +65,6 @@ You are an expert logic circuit designer inside a web simulator. Your ONLY goal 
 
 REMEMBER: ONLY provide the valid JSON array. Double-check that ALL required parameters (id, type, x, y, from_id, from_node, to_id, to_node) are included in every action. Your entire response must be ONLY the JSON.
 `,
-
-    // --- *** SCHEMA REMOVED *** ---
-    // We will rely on the prompt and manual validation instead.
 
     // --- UI Elements ---
     modalBackdrop: null,
@@ -120,7 +133,7 @@ REMEMBER: ONLY provide the valid JSON array. Double-check that ALL required para
         this.promptInput.disabled = isLoading; // Disable input while loading
     },
 
-setError: function(message) {
+    setError: function(message) {
         this.errorText.textContent = message;
         this.errorText.classList.remove('hidden');
     },
@@ -133,7 +146,54 @@ setError: function(message) {
     // --- API & Execution ---
 
     /**
-     * Called when the user clicks "Send" or presses Enter
+     * --- NEW: Generates a name for the current circuit ---
+     * @param {object} circuitData - The circuit data from Simulator.getCircuitData()
+     * @returns {string} - The suggested circuit name
+     */
+    generateCircuitName: async function(circuitData) {
+        console.log("AI: Generating circuit name...");
+        const userPrompt = `Here is the circuit JSON: ${JSON.stringify(circuitData)}`;
+        const apiUrl = `${this.API_URL}?key=${this.API_KEY}`;
+
+        const payload = {
+            contents: [{ parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: this.NAME_SYSTEM_PROMPT }] },
+            generationConfig: {
+                temperature: 0.2, // Low temp for more deterministic names
+                maxOutputTokens: 50 // A name shouldn't be long
+            }
+        };
+        
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`AI name generation failed: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.candidates && result.candidates[0].content?.parts?.[0]?.text) {
+                const name = result.candidates[0].content.parts[0].text;
+                console.log("AI: Generated name:", name);
+                // Clean up the name (remove quotes or newlines)
+                return name.trim().replace(/"/g, '');
+            } else {
+                throw new Error("AI response was empty or malformed.");
+            }
+        } catch (error) {
+            console.error("Error in generateCircuitName:", error);
+            throw error; // Re-throw to be caught by StorageManager
+        }
+    },
+
+
+    /**
+     * Called when the user clicks "Send" or presses Enter (for BUILDING circuits)
      */
     async sendAIPrompt() {
         const userPrompt = this.promptInput.value;
@@ -147,19 +207,14 @@ setError: function(message) {
         this.chatMessages.push({ role: "user", parts: [{ text: userPrompt }] });
 
         try {
-            const apiKey = "AIzaSyD5tQg_ls50hZGVX24zGqGN0nDbHM1xsNE"; // API key is injected
-            // Use flash model for speed and cost
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            // --- MODIFIED: Use centralized config ---
+            const apiUrl = `${this.API_URL}?key=${this.API_KEY}`;
 
             const payload = {
                 contents: this.chatMessages,
-                // Using the updated, stricter SYSTEM_PROMPT
                 systemInstruction: { parts: [{ text: this.SYSTEM_PROMPT }] },
-                // --- *** SCHEMA REMOVED *** ---
                 generationConfig: {
-                    // Still ask for JSON mime type, helps guide the model
                     responseMimeType: "application/json",
-                    // Low temperature for more deterministic plans
                     temperature: 0.1
                 }
             };
@@ -185,39 +240,31 @@ setError: function(message) {
                     }
 
                     console.warn(`API call failed with status: ${response.status}`);
-                    // Check for retryable HTTP status codes
                     if (response.status === 429 || response.status >= 500) {
                         // Wait and increase delay for retry
                     } else {
-                        // Not a retryable error (e.g., 400 Bad Request)
-                        // Try to get error message from response body
                         const errorData = await response.json();
                         throw new Error(errorData.error?.message || `HTTP error ${response.status}`);
                     }
                 } catch (fetchError) {
                     console.error("Fetch error during API call attempt:", fetchError);
-                    // If max retries reached, throw the last error
                     if (retries >= maxRetries - 1) throw fetchError;
-                    // Otherwise, just wait for the next retry
                 }
 
-                // Increment retry count and wait before next attempt
                 retries++;
                 if (retries < maxRetries) {
                     console.log(`Retrying after ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // Double the delay for next time
+                    delay *= 2; 
                 }
             }
             // --- End of retry logic ---
 
-            // Check if all retries failed
             if (!response || !response.ok) {
                 let specificError = "the API request failed";
                 if (response) {
                     specificError += ` (Status: ${response.status})`;
                     if (response.status === 400) {
-                        // 400 often means API key issues or malformed request *before* schema check
                          specificError = "the request was invalid. Please check your API key and ensure it's enabled";
                     }
                 } else {
@@ -229,25 +276,16 @@ setError: function(message) {
             // --- Process successful response ---
             const result = await response.json();
 
-            // Check for valid response structure
             if (result.candidates && result.candidates[0].content?.parts?.[0]?.text) {
                 const jsonText = result.candidates[0].content.parts[0].text;
                 let actions;
 
-                // --- *** MORE ROBUST PARSING AND VALIDATION *** ---
                 try {
-                     // 1. Clean the text response - sometimes models add markdown ```json ... ```
                      const cleanedJsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-                     
-                     // 2. Try to parse the cleaned JSON
                      actions = JSON.parse(cleanedJsonText);
-
-                     // 3. Check if it's an array
                      if (!Array.isArray(actions)) {
                          throw new Error("The response wasn't a list (array) of steps.");
                      }
-
-                     // 4. Validate the *structure* of each action more thoroughly
                      for (const action of actions) {
                          if (!action || typeof action !== 'object') throw new Error("A step in the plan wasn't a valid object.");
                          if (typeof action.command !== 'string' || !action.command) throw new Error("A step is missing the 'command' field.");
@@ -258,7 +296,6 @@ setError: function(message) {
                              if (typeof action.params.type !== 'string' || !action.params.type) throw new Error(`addComponent '${action.params.id}' is missing 'type'.`);
                              if (typeof action.params.x !== 'number') throw new Error(`addComponent '${action.params.id}' is missing 'x'.`);
                              if (typeof action.params.y !== 'number') throw new Error(`addComponent '${action.params.id}' is missing 'y'.`);
-                             // Note: We don't validate 'label' because it's optional
                          } else if (action.command === 'addWire') {
                               if (typeof action.params.from_id !== 'string' || !action.params.from_id) throw new Error("addWire is missing 'from_id'.");
                               if (action.params.from_node !== 'out') throw new Error("addWire 'from_node' must be 'out'.");
@@ -268,21 +305,17 @@ setError: function(message) {
                               throw new Error(`Unknown command '${action.command}' found in the plan.`);
                          }
                      }
-                     // If we get here, the plan *looks* structurally valid
-
                 } catch (parseError) {
                     console.error("JSON Parsing/Validation Error:", parseError, "Raw text:", jsonText);
                     throw new Error(`Sorry, I couldn't quite understand the plan the AI gave me. It wasn't in the expected JSON format. (${parseError.message})`);
                 }
                 // --- ---
 
-                // Add the AI's *parsed plan* (which might differ slightly from raw text) to chat history
-                this.chatMessages.push({ role: "model", parts: [{ text: JSON.stringify(actions, null, 2) }] }); // Store pretty-printed valid JSON
+                this.chatMessages.push({ role: "model", parts: [{ text: JSON.stringify(actions, null, 2) }] });
                 this.addMessageToChat('assistant', "Okay, looks like a plan! Let me start building that for you...");
                 this.hideModal();
-                await this.executePlan(actions); // Run the "robot"
+                await this.executePlan(actions);
             } else {
-                // Handle cases where the response structure is unexpected or content is blocked
                 let errorMsg = "Hmm, I didn't get a valid plan back from the AI.";
                 if (result.candidates && result.candidates[0].finishReason === 'SAFETY') {
                     errorMsg = "Sorry, I can't build that. The request might have triggered a safety filter. Could you try rephrasing?";
@@ -298,7 +331,6 @@ setError: function(message) {
             console.error("AI Error in sendAIPrompt:", error);
             this.setError(`Error: ${error.message}`);
             this.addMessageToChat('assistant', `Oh dear, something went wrong: ${error.message}`);
-            // Remove the failed user prompt from history so we don't send it again
             if (this.chatMessages.length > 0 && this.chatMessages[this.chatMessages.length - 1].role === 'user') {
                 this.chatMessages.pop();
             }
@@ -312,8 +344,8 @@ setError: function(message) {
      * @param {Array} actions - The array of actions from the AI
      */
     async executePlan(actions) {
-        this.tempComponentMap.clear(); // Clear mapping from previous runs
-        Simulator.resetSimulation(); // Clear the canvas and logs
+        this.tempComponentMap.clear(); 
+        Simulator.resetSimulation(); 
         AnimationManager.logStep("Alright, AI is taking the wheel! Let's build this circuit...");
 
         if (!actions || actions.length === 0) {
@@ -323,36 +355,31 @@ setError: function(message) {
 
         for (const [index, action] of actions.entries()) {
              AnimationManager.log(`Step ${index + 1}/${actions.length}: ${action.command}...`);
-             // Add a delay for the "animation" effect
-            await new Promise(resolve => setTimeout(resolve, 300)); // 300ms per step
+            await new Promise(resolve => setTimeout(resolve, 300)); 
 
             try {
-                // Basic validation (already done more thoroughly after fetch, but good backup)
                 if (!action || typeof action !== 'object' || !action.command || !action.params) {
                     throw new Error("This step in the plan is invalid or incomplete.");
                 }
 
-                // Execute based on command
                 if (action.command === 'addComponent') {
                     this.executeAddComponent(action.params);
                 } else if (action.command === 'addWire') {
                     this.executeAddWire(action.params);
                 } else {
-                     // Should have been caught by validation, but just in case
                      throw new Error(`I encountered an unknown command: "${action.command}".`);
                 }
             } catch (error) {
                 console.error("AI Plan Execution Error:", error, "Action:", action);
                 AnimationManager.logError(`Oops! Hit a snag during step ${index + 1}: ${error.message}. Stopping the build.`);
-                // Show error in modal as well, in case it was hidden
                 this.setError(`Build failed at step ${index + 1}: ${error.message}`);
-                return; // Stop execution
+                return; 
             }
         }
         
         AnimationManager.logStep("AI build finished! Looks good. Let's run a quick simulation...");
-        AnimationManager.startSimulation(); // Run simulation automatically after building
-        Simulator.autoSaveCircuit(); // --- MODIFIED: Use autoSave ---
+        AnimationManager.startSimulation(); 
+        Simulator.autoSaveCircuit();
     },
 
     /**
@@ -360,12 +387,11 @@ setError: function(message) {
      * @param {object} params - The parameters for the command.
      */
     executeAddComponent: function(params) {
-        // Validation should have caught missing fields, but double-check type specifically
         if (!params || typeof params.type !== 'string' || !params.type.trim()) {
             throw new Error(`Missing or invalid component type for component ID '${params?.id || 'unknown'}'.`);
         }
         const componentType = params.type.trim().toUpperCase();
-        const componentId = params.id.trim(); // Assume ID is valid from previous check
+        const componentId = params.id.trim(); 
 
         if (this.tempComponentMap.has(componentId)) {
             throw new Error(`The AI tried to use the same name "${componentId}" for two different components.`);
@@ -391,7 +417,6 @@ setError: function(message) {
                  throw new Error(`I don't know how to build a component called "${componentType}".`);
         }
 
-        // --- NEW: Check for and set the custom label ---
         if (params.label && typeof params.label === 'string' && newComponent.setCustomLabel) {
             newComponent.setCustomLabel(params.label);
             AnimationManager.log(`   ...and labeling it: "${params.label}"`);
@@ -399,7 +424,7 @@ setError: function(message) {
         // ---
 
         Simulator.addComponent(newComponent);
-        this.tempComponentMap.set(componentId, newComponent); // Store mapping: AI ID -> Actual Component
+        this.tempComponentMap.set(componentId, newComponent); 
         AnimationManager.log(`   Placing a ${componentType} named "${componentId}"`);
     },
 
@@ -408,7 +433,6 @@ setError: function(message) {
      * @param {object} params - The parameters for the command.
      */
     executeAddWire: function(params) {
-         // Assume params are valid from previous check
         const fromId = params.from_id.trim();
         const toId = params.to_id.trim();
         const fromNodeName = params.from_node.trim(); // Should be 'out'
@@ -420,7 +444,6 @@ setError: function(message) {
         if (!fromComponent) throw new Error(`Plan references component "${fromId}" before it was created.`);
         if (!toComponent) throw new Error(`Plan references component "${toId}" before it was created.`);
         
-        // Find the specific nodes using labels/names
         const fromNode = fromComponent.outputNodes.find(n => n.label === fromNodeName);
         if (!fromNode) throw new Error(`Component "${fromId}" doesn't have an output named "${fromNodeName}".`);
         

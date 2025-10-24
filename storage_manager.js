@@ -403,9 +403,5 @@ const StorageManager = {
             this.loadList.appendChild(item);
         }
         
-        // Refresh icons
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
-    }
+        
 };

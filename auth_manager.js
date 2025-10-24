@@ -20,6 +20,7 @@ const AuthManager = {
     db: null,
     
     currentUserId: null,
+    currentUser: null, // --- NEW: Store the full user object
     
     // --- 2. Initialization ---
     
@@ -31,7 +32,6 @@ const AuthManager = {
         console.log("Auth Manager initializing...");
         
         try {
-            // --- *** FIX: Call initializeFirebase directly with the config *** ---
             this.initializeFirebase(firebaseConfig);
         } catch (error) {
             console.error("Critical error during AuthManager init:", error);
@@ -39,13 +39,15 @@ const AuthManager = {
             this.updateAuthButton(null, true); // Show error on button
         }
         
-        // Add a listener to the auth button
+        // --- MODIFIED: Add smart listener for Login/Logout ---
         const authButton = document.getElementById('auth-btn');
         authButton?.addEventListener('click', () => {
             if (this.currentUserId) {
-                AnimationManager.logStep(`You are logged in. User ID: \`${this.currentUserId}\``);
+                // If user is logged IN, the button should log them OUT
+                this.signOutUser();
             } else {
-                AnimationManager.logError("Still connecting... please wait.");
+                // If user is logged OUT, the button should log them IN
+                this.signInWithGoogle();
             }
         });
     },
@@ -64,7 +66,8 @@ const AuthManager = {
         // De-structure the functions we need from the global object
         const { 
             initializeApp, getAuth, getFirestore, 
-            onAuthStateChanged, signInAnonymously 
+            onAuthStateChanged
+            // --- REMOVED: signInAnonymously ---
         } = window.firebase;
 
         try {
@@ -76,42 +79,88 @@ const AuthManager = {
             this.auth = getAuth(this.app);
             this.db = getFirestore(this.app); // Initialize Firestore
 
-            // --- Auth State Listener ---
+            // --- Auth State Listener (Unchanged, but more powerful) ---
             onAuthStateChanged(this.auth, (user) => {
                 if (user) {
                     // User is signed in
                     this.currentUserId = user.uid;
-                    console.log("Firebase Auth: User signed in with ID:", this.currentUserId);
+                    this.currentUser = user; // --- NEW: Store user object
+                    console.log("Firebase Auth: User signed in:", user.displayName, user.uid);
                     this.updateAuthButton(user);
                     
                     if (window.StorageManager) {
                          StorageManager.onUserLogin(this.currentUserId);
                     }
-                    AnimationManager.logStep("Connected to cloud services.");
+                    AnimationManager.logStep(`Welcome, ${user.displayName}! Connected to cloud services.`);
                     
                 } else {
                     // User is signed out
                     this.currentUserId = null;
+                    this.currentUser = null; // --- NEW: Clear user object
                     console.log("Firebase Auth: User signed out.");
                     this.updateAuthButton(null);
                     
                     if (window.StorageManager) {
                          StorageManager.onUserLogout();
                     }
-                    AnimationManager.logError("Disconnected from cloud services.");
+                    AnimationManager.logError("Disconnected from cloud services. Please login to save.");
                 }
             });
             
-            // --- *** FIX: Simplified Sign-In *** ---
-            // We removed all token logic and will ONLY sign in anonymously.
-            // This will get a valid user ID every time.
-            console.log("Signing in anonymously...");
-            await signInAnonymously(this.auth);
+            // --- REMOVED: No more automatic sign-in ---
+            // await signInAnonymously(this.auth);
 
         } catch (error) {
             console.error("Firebase initialization error:", error);
             AnimationManager.logError(`Auth Error: ${error.message}`);
             this.updateAuthButton(null, true); // Show error state
+        }
+    },
+    
+    // --- NEW: Google Sign-In Function ---
+    signInWithGoogle: async function() {
+        if (!this.auth || !window.firebase) {
+            AnimationManager.logError("Auth service is not ready.");
+            return;
+        }
+        
+        const { GoogleAuthProvider, signInWithPopup } = window.firebase;
+        const provider = new GoogleAuthProvider();
+        
+        try {
+            AnimationManager.logStep("Opening Google Sign-In popup...");
+            const result = await signInWithPopup(this.auth, provider);
+            // This will trigger the `onAuthStateChanged` listener,
+            // which will handle the rest of the login flow.
+            AnimationManager.logStep(`Login successful for ${result.user.displayName}`);
+        } catch (error) {
+            if (error.code === 'auth/popup-closed-by-user') {
+                AnimationManager.logError("Sign-in cancelled.");
+            } else {
+                console.error("Google Sign-In Error:", error);
+                AnimationManager.logError(`Sign-in failed: ${error.message}`);
+            }
+        }
+    },
+    
+    // --- NEW: Sign-Out Function ---
+    signOutUser: async function() {
+        if (!this.auth || !window.firebase) {
+            AnimationManager.logError("Auth service is not ready.");
+            return;
+        }
+        
+        const { signOut } = window.firebase;
+        
+        try {
+            AnimationManager.logStep("Logging out...");
+            await signOut(this.auth);
+            // This will trigger the `onAuthStateChanged` listener,
+            // which will handle the rest of the logout flow.
+            AnimationManager.logStep("Logout successful.");
+        } catch (error) {
+            console.error("Sign-Out Error:", error);
+            AnimationManager.logError(`Sign-out failed: ${error.message}`);
         }
     },
 
@@ -133,27 +182,25 @@ const AuthManager = {
             authButton.title = "Could not connect to authentication services.";
             authButton.classList.add('tool-delete'); // Make it red
         } else if (user) {
-            if (icon) icon.setAttribute('data-lucide', 'user');
-            if (span) span.textContent = 'Account';
-            // Show the first 6 chars of UID in the tooltip
-            const shortId = user.uid.substring(0, 6);
-            authButton.title = `Logged in as: ${shortId}...`;
+            // --- MODIFIED: Show user name and Logout icon ---
+            if (icon) icon.setAttribute('data-lucide', 'log-out'); // Change to logout icon
+            if (span) span.textContent = user.displayName || "Account"; // Show user's name
+            authButton.title = `Logged in as: ${user.email}\nClick to Log Out.`;
             authButton.classList.remove('tool-delete');
-            authButton.style.borderColor = 'var(--gate-color)';
+            authButton.style.borderColor = 'var(--gate-color)'; // Green border
             authButton.style.color = 'var(--gate-color)';
         } else {
-            // Default "Login" state
+            // --- MODIFIED: Default "Login with Google" state ---
             if (icon) icon.setAttribute('data-lucide', 'log-in');
-            if (span) span.textContent = 'Login';
-            authButton.title = "Login for Cloud Save";
+            if (span) span.textContent = 'Login'; // "Login"
+            authButton.title = "Login with Google for Cloud Save";
             authButton.classList.remove('tool-delete');
             authButton.style.borderColor = 'var(--auth-color)';
-route
             authButton.style.color = 'var(--auth-color)';
         }
         
         // We *must* call this, as we've changed the `data-lucide` attribute
-        if (typeof lucide !== 'undefined') {
+        if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
             lucide.createIcons();
         }
     },

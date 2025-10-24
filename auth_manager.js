@@ -82,11 +82,13 @@ const AuthManager = {
                     console.log("Firebase Auth: User signed in with ID:", this.currentUserId);
                     this.updateAuthButton(user);
                     
+                    // --- *** MODIFIED: THIS IS THE FINAL CONNECTION *** ---
                     // Tell the app we're ready for cloud storage
                     if (window.StorageManager) {
-                         // We'll implement this function in storage_manager.js later
-                         // StorageManager.onUserLogin(this.currentUserId);
+                         StorageManager.onUserLogin(this.currentUserId);
                     }
+                    // --- *** ---
+                    
                     AnimationManager.logStep("Connected to cloud services.");
                     
                 } else {
@@ -94,10 +96,13 @@ const AuthManager = {
                     this.currentUserId = null;
                     console.log("Firebase Auth: User signed out.");
                     this.updateAuthButton(null);
+                    
+                    // --- *** MODIFIED: THIS IS THE FINAL CONNECTION *** ---
                     if (window.StorageManager) {
-                         // We'll implement this function in storage_manager.js later
-                         // StorageManager.onUserLogout();
+                         StorageManager.onUserLogout();
                     }
+                    // --- *** ---
+                    
                     AnimationManager.logError("Disconnected from cloud services.");
                 }
             });

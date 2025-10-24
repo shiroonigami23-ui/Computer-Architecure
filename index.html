@@ -228,5 +228,27 @@
     <script src="storage_manager.js"></script>
     <script src="input_handler.js"></script>
     <script src="main.js"></script>
-</body>
+
+    <script>
+        function startApp() {
+            console.log("Lucide is ready. Starting AuthManager...");
+            AuthManager.init();
+        }
+
+        function checkLucide() {
+            if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+                // Lucide is loaded!
+                startApp();
+            } else {
+                // Lucide not loaded yet, check again
+                console.log("Waiting for Lucide to load...");
+                setTimeout(checkLucide, 50); // Check every 50ms
+            }
+        }
+
+        // Start checking after the window is fully loaded
+        // This ensures all .js files (like auth_manager.js) are parsed first
+        window.onload = checkLucide;
+    </script>
+    </body>
 </html>

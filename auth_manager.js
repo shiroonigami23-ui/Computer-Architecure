@@ -27,7 +27,7 @@ const AuthManager = {
     
     /**
      * Initializes the AuthManager.
-     * This function is called by Main.init()
+     * This function is now called by the bootloader in index.html
      */
     init: function() {
         console.log("Auth Manager initializing...");
@@ -40,6 +40,12 @@ const AuthManager = {
         
         // --- Hook up splash screen login button ---
         this.splashLoginBtn?.addEventListener('click', () => this.signInWithGoogle());
+        
+        // --- Draw splash screen icons immediately ---
+        // This is safe because the bootloader waited for lucide
+        if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
         
         try {
             this.initializeFirebase(firebaseConfig);
@@ -296,8 +302,5 @@ const AuthManager = {
     }
 };
 
-// --- NEW: Auto-run the AuthManager ---
-// This kicks off the whole process on page load.
-window.onload = () => {
-    AuthManager.init();
-};
+// --- MODIFIED: REMOVED the window.onload block ---
+// The bootloader in index.html handles this now.

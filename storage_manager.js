@@ -26,7 +26,6 @@ const StorageManager = {
     init: function() {
         console.log("Storage Manager initializing...");
         
-        // De-structure the functions we'll need from the global object
         // This is just a safety check
         if (!window.firebase) {
             console.error("Firebase SDK not loaded. Storage Manager cannot start.");
@@ -177,14 +176,18 @@ const StorageManager = {
      * Subscribes to the user's private circuit collection in Firestore.
      */
     subscribeToCircuitSaves: function() {
-        if (!this.currentUserId) return;
+        if (!this.currentUserId || !AuthManager.db) {
+            console.warn("StorageManager: Cannot subscribe, user or DB not ready.");
+            return;
+        }
 
         // Unsubscribe from any previous listener
         if (this.unsubscribeFromSaves) this.unsubscribeFromSaves();
         
         const { collection, query, onSnapshot } = window.firebase;
         const db = AuthManager.db;
-        const appId = AuthManager.getAppId();
+        // --- FIX: Get appId from AuthManager ---
+        const appId = AuthManager.getProjectId(); 
         
         try {
             const collectionPath = `artifacts/${appId}/users/${this.currentUserId}/circuits`;
@@ -240,7 +243,8 @@ const StorageManager = {
         // Get functions from global
         const { doc, setDoc, serverTimestamp } = window.firebase;
         const db = AuthManager.db;
-        const appId = AuthManager.getAppId();
+        // --- FIX: Get appId from AuthManager ---
+        const appId = AuthManager.getProjectId();
         
         try {
             // Get the circuit data from the simulator
@@ -331,11 +335,12 @@ const StorageManager = {
         
         if (!confirm(`Are you sure you want to delete "${name}"?\nThis action cannot be undone.`)) {
             return;
-        }
+FS        }
 
         const { doc, deleteDoc } = window.firebase;
         const db = AuthManager.db;
-        const appId = AuthManager.getAppId();
+        // --- FIX: Get appId from AuthManager ---
+        const appId = AuthManager.getProjectId();
 
         try {
             // Create a reference to the document
@@ -403,8 +408,8 @@ const StorageManager = {
             this.loadList.appendChild(item);
         }
         // Refresh icons
-        if (typeof lucide !== 'undefined') {
+        if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
             lucide.createIcons();
         }
     }
-        };
+};

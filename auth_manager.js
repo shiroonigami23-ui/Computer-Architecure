@@ -2,6 +2,17 @@
 // This manager handles all Firebase initialization and user authentication.
 // Its job is to get a user signed in and provide the user's ID to other managers.
 
+// --- *** FIX: Added your specific Firebase Config *** ---
+const firebaseConfig = {
+  apiKey: "AIzaSyCGRmgpO1bqkn6EMqWLExJLW8R7uTCZpIM",
+  authDomain: "computer-arch-169e8.firebaseapp.com",
+  projectId: "computer-arch-169e8",
+  storageBucket: "computer-arch-169e8.firebasestorage.app",
+  messagingSenderId: "1003598893307",
+  appId: "1:1003598893307:web:8a731f4b492148815e205e"
+};
+// --- *** END FIX *** ---
+
 const AuthManager = {
     // --- 1. Properties ---
     app: null,
@@ -9,7 +20,6 @@ const AuthManager = {
     db: null,
     
     currentUserId: null,
-    appId: 'default-app-id', // Will be replaced by global variable
     
     // --- 2. Initialization ---
     
@@ -20,14 +30,9 @@ const AuthManager = {
     init: function() {
         console.log("Auth Manager initializing...");
         
-        // Get global config provided by the environment
         try {
-            this.appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-            
-            // Start the firebase connection
-            this.initializeFirebase(firebaseConfigStr);
-
+            // --- *** FIX: Call initializeFirebase directly with the config *** ---
+            this.initializeFirebase(firebaseConfig);
         } catch (error) {
             console.error("Critical error during AuthManager init:", error);
             AnimationManager.logError(`Auth Error: ${error.message}`);
@@ -35,7 +40,6 @@ const AuthManager = {
         }
         
         // Add a listener to the auth button
-        // For now, it just logs the user ID when clicked
         const authButton = document.getElementById('auth-btn');
         authButton?.addEventListener('click', () => {
             if (this.currentUserId) {
@@ -48,9 +52,9 @@ const AuthManager = {
 
     /**
      * Connects to Firebase, sets up auth, and signs in the user.
-     * @param {string} firebaseConfigStr - The JSON string config.
+     * @param {object} config - The firebaseConfig object.
      */
-    initializeFirebase: async function(firebaseConfigStr) {
+    initializeFirebase: async function(config) {
         if (!window.firebase) {
             console.error("Firebase SDK not loaded. Auth Manager cannot start.");
             AnimationManager.logError("Error: Firebase services failed to load.");
@@ -60,21 +64,19 @@ const AuthManager = {
         // De-structure the functions we need from the global object
         const { 
             initializeApp, getAuth, getFirestore, 
-            onAuthStateChanged, signInAnonymously, signInWithCustomToken 
+            onAuthStateChanged, signInAnonymously 
         } = window.firebase;
 
         try {
-            const firebaseConfig = JSON.parse(firebaseConfigStr);
-            if (!firebaseConfig.apiKey) {
+            if (!config.apiKey) {
                  throw new Error("Firebase config is missing or invalid.");
             }
 
-            this.app = initializeApp(firebaseConfig);
+            this.app = initializeApp(config);
             this.auth = getAuth(this.app);
             this.db = getFirestore(this.app); // Initialize Firestore
 
             // --- Auth State Listener ---
-            // This runs ONCE on load, and again any time auth changes
             onAuthStateChanged(this.auth, (user) => {
                 if (user) {
                     // User is signed in
@@ -82,13 +84,9 @@ const AuthManager = {
                     console.log("Firebase Auth: User signed in with ID:", this.currentUserId);
                     this.updateAuthButton(user);
                     
-                    // --- *** MODIFIED: THIS IS THE FINAL CONNECTION *** ---
-                    // Tell the app we're ready for cloud storage
                     if (window.StorageManager) {
                          StorageManager.onUserLogin(this.currentUserId);
                     }
-                    // --- *** ---
-                    
                     AnimationManager.logStep("Connected to cloud services.");
                     
                 } else {
@@ -97,27 +95,18 @@ const AuthManager = {
                     console.log("Firebase Auth: User signed out.");
                     this.updateAuthButton(null);
                     
-                    // --- *** MODIFIED: THIS IS THE FINAL CONNECTION *** ---
                     if (window.StorageManager) {
                          StorageManager.onUserLogout();
                     }
-                    // --- *** ---
-                    
                     AnimationManager.logError("Disconnected from cloud services.");
                 }
             });
             
-            // --- Initial Sign-In ---
-            // Try token auth first, fall back to anonymous
-            const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-            
-            if (authToken) {
-                console.log("Attempting to sign in with custom token...");
-                await signInWithCustomToken(this.auth, authToken);
-            } else {
-                console.log("No custom token found, signing in anonymously...");
-                await signInAnonymously(this.auth);
-            }
+            // --- *** FIX: Simplified Sign-In *** ---
+            // We removed all token logic and will ONLY sign in anonymously.
+            // This will get a valid user ID every time.
+            console.log("Signing in anonymously...");
+            await signInAnonymously(this.auth);
 
         } catch (error) {
             console.error("Firebase initialization error:", error);
@@ -150,7 +139,6 @@ const AuthManager = {
             const shortId = user.uid.substring(0, 6);
             authButton.title = `Logged in as: ${shortId}...`;
             authButton.classList.remove('tool-delete');
-            // --- NEW: Make it green to show success ---
             authButton.style.borderColor = 'var(--gate-color)';
             authButton.style.color = 'var(--gate-color)';
         } else {
@@ -159,7 +147,8 @@ const AuthManager = {
             if (span) span.textContent = 'Login';
             authButton.title = "Login for Cloud Save";
             authButton.classList.remove('tool-delete');
-            authButton.style.borderColor = 'var(--auth-color)'; // Back to teal
+            authButton.style.borderColor = 'var(--auth-color)';
+route
             authButton.style.color = 'var(--auth-color)';
         }
         
@@ -180,10 +169,10 @@ const AuthManager = {
     },
     
     /**
-     * Public getter for the app ID.
+     * Public getter for the project ID.
      * @returns {string} The current app's ID.
      */
-    getAppId: function() {
-         return this.appId;
+    getProjectId: function() {
+         return firebaseConfig.projectId;
     }
 };

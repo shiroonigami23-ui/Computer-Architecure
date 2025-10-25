@@ -265,8 +265,12 @@
             }
         }
 
-        // Start the entire boot process
-        checkLucide();
+        // *** FIX: DO NOT RUN checkLucide() immediately. ***
+        // Wait for all scripts (like lucide.min.js) to be loaded.
+        window.addEventListener('load', () => {
+             console.log("Window loaded. Starting bootloader...");
+             checkLucide();
+        });
     </script>
     <!-- *** --- *** -->
 </body>

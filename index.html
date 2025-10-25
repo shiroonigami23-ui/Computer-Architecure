@@ -136,7 +136,7 @@
                 <div class="ai-message assistant"> Hello! What circuit would you like me to build for you? (e.g., "a half-adder" or "an SR latch") </div>
             </div>
             <div id="ai-input-area">
-                <textarea id="ai-prompt-input" placeholder="e.g., 'Build an AND gate only NAND gates'" rows="2"></textarea>
+                <textarea id="ai-prompt-input" placeholder="e.g., 'Build an AND gate using only NAND gates'" rows="2"></textarea>
                 <button id="ai-send-btn" title="Send"> <i data-lucide="send"></i> </button>
             </div>
             <div id="ai-status">
@@ -183,7 +183,6 @@
     <!-- (All script tags from before are unchanged) -->
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
     
-    <!-- *** UPDATED FIREBASE SCRIPT *** -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
@@ -211,7 +210,7 @@
             serverTimestamp
         };
         
-        // 2. *** NEW: Set the flag to true *after* all imports are done ***
+        // 2. Set the flag to true *after* all imports are done
         window.firebaseReady = true;
         console.log("Firebase SDK is ready.");
     </script>
@@ -226,12 +225,12 @@
     <script src="input_handler.js"></script>
     <script src="main.js"></script>
 
-    <!-- *** UPDATED: App Bootloader Script *** -->
+    <!-- *** FINAL, CORRECTED Bootloader Script *** -->
     <script>
         function startApp() {
-            // This function is now ONLY called when BOTH are ready
+            // This function is now ONLY called when BOTH lucide and firebase are ready
             console.log("Lucide and Firebase are ready. Starting AuthManager...");
-            AuthManager.init();
+            AuthManager.init(); // AuthManager now safely exists
         }
         
         function checkFirebase() {
@@ -247,7 +246,7 @@
         }
 
         function checkLucide() {
-            // This function runs first
+            // This function runs first after window.load
             if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
                 // 1. Lucide is ready, draw the spinner
                 try {
@@ -265,11 +264,10 @@
             }
         }
 
-        // *** FIX: DO NOT RUN checkLucide() immediately. ***
-        // Wait for all scripts (like lucide.min.js) to be loaded.
+        // *** THE FIX: Start the entire boot process ONLY after ALL scripts are loaded ***
         window.addEventListener('load', () => {
-             console.log("Window loaded. Starting bootloader...");
-             checkLucide();
+             console.log("Window loaded. Starting bootloader checks...");
+             checkLucide(); // Start checking for Lucide first
         });
     </script>
     <!-- *** --- *** -->

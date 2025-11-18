@@ -1,10 +1,11 @@
 const firebaseConfig = {
-  apiKey: "AIzaSyCGRmgpO1bqkn6EMqWLExJLW8R7uTCZpIM",
-  authDomain: "computer-arch-169e8.firebaseapp.com",
-  projectId: "computer-arch-169e8",
-  storageBucket: "computer-arch-169e8.firebasestorage.app",
-  messagingSenderId: "1003598893307",
-  appId: "1:1003598893307:web:8a731f4b492148815e205e"
+  apiKey: "AIzaSyDSvQT6Zd-vX6T9qK5_y_kYCg7epRrgYQ0",
+  authDomain: "computer-architecure-b52ab.firebaseapp.com",
+  projectId: "computer-architecure-b52ab",
+  storageBucket: "computer-architecure-b52ab.firebasestorage.app",
+  messagingSenderId: "231863630415",
+  appId: "1:231863630415:web:1e53d1502b60c06219083a",
+  measurementId: "G-QPXDK7G9GX"
 };
 // --- *** END FIX *** ---
 
